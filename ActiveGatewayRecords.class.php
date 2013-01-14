@@ -2,7 +2,7 @@
 /**
  * PHP version 5.
  *
- * Copyright (c) 2007-2010, Samurai Framework Project, All rights reserved.
+ * Copyright (c) Samurai Framework Project, All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -27,23 +27,30 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * @package    ActiveGateway
- * @copyright  2007-2010 Samurai Framework Project
- * @link       http://samurai-fw.org/
- * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
- * @version    SVN: $Id$
+ * @package     ActiveGateway
+ * @copyright   Samurai Framework Project
+ * @link        http://samurai-fw.org/
+ * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 
 /**
  * ActiveGatewayにおいて、レコードの集合を管理するクラス
  *
- * @package    ActiveGateway
- * @copyright  2007-2010 Samurai Framework Project
- * @author     KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
- * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
+ * @package     ActiveGateway
+ * @copyright   Samurai Framework Project
+ * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
+ * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 class ActiveGatewayRecords implements Iterator
 {
+    /**
+     * alias
+     *
+     * @access  public
+     * @var     string
+     */
+    public $alias;
+
     /**
      * レコードの集合
      *
@@ -80,6 +87,18 @@ class ActiveGatewayRecords implements Iterator
     }
 
 
+
+
+    /**
+     * aliasをセット
+     *
+     * @access  public
+     * @param   string  $alias
+     */
+    public function setAlias($alias)
+    {
+        $this->alias = $alias;
+    }
 
 
 
@@ -168,6 +187,34 @@ class ActiveGatewayRecords implements Iterator
         if(!$this->_records) return;
         $key = array_rand($this->_records);
         return $this->_records[$key];
+    }
+    
+    /**
+     * 無作為に1レコードを取り出して、削除
+     *
+     * @access     public
+     * @return     object   ActiveGatewayRecord
+     */
+    public function getRandomAndRemove()
+    {
+        if(!$this->_records) return;
+        $key = array_rand($this->_records);
+        $record = $this->_records[$key];
+        unset($this->_records[$key]);
+        return $record;
+    }
+
+
+    /**
+     * 一番最後のレコードを取得して削除
+     *
+     * @access  public
+     * @return  object  ActiveGatewayRecord
+     */
+    public function pop()
+    {
+        if(!$this->_records) return NULL;
+        return array_pop($this->_records);
     }
 
 

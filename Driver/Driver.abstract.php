@@ -2,7 +2,7 @@
 /**
  * PHP version 5.
  *
- * Copyright (c) 2007-2010, Samurai Framework Project, All rights reserved.
+ * Copyright (c) Samurai Framework Project, All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -27,11 +27,10 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * @package    ActiveGateway
- * @copyright  2007-2010 Samurai Framework Project
- * @link       http://samurai-fw.org/
- * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
- * @version    SVN: $Id$
+ * @package     ActiveGateway
+ * @copyright   Samurai Framework Project
+ * @link        http://samurai-fw.org/
+ * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 
 /**
@@ -39,11 +38,11 @@
  *
  * 各種ドライバーは必ず継承すること
  * 
- * @package    ActiveGateway
- * @subpackage Driver
- * @copyright  2007-2010 Samurai Framework Project
- * @author     KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
- * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
+ * @package     ActiveGateway
+ * @subpackage  Driver
+ * @copyright   Samurai Framework Project
+ * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
+ * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 abstract class ActiveGateway_Driver
 {
@@ -64,12 +63,28 @@ abstract class ActiveGateway_Driver
     protected $connection_master;
 
     /**
+     * DSN
+     *
+     * @access  protected
+     * @var     string
+     */
+    protected $dsn;
+    protected $dsn_master;
+
+    /**
      * トランザクション内かどうか
      *
      * @access   protected
      * @var      boolean
      */
     protected $_in_transaction = false;
+
+    /**
+     * マーカー
+     *
+     * @access  protected
+     */
+    protected $_marker = '';
 
 
     /**
@@ -89,19 +104,29 @@ abstract class ActiveGateway_Driver
     /**
      * 接続
      *
-     * @access     public
-     * @param      string  $dsn          DSN
-     * @param      string  $dsn_master   マスターDSN
+     * @access  public
+     * @param   string  $target
+     * @param   string  $dsn    DSN
      */
-    public function connect($dsn, $dsn_master='')
+    public function connect($target, $dsn)
     {
-        $this->connection = $this->_connect(parse_url($dsn));
-        if(!$dsn_master){
-            $this->connection_master = $this->connection;
-        } elseif($dsn_master == $dsn){
-            $this->connection_master = $this->connection;
+        $AGM = ActiveGatewayManager::singleton();
+        if($target == 'slave'){
+            $this->dsn = $dsn;
+            if($AGM->hasConnection($dsn)){
+                $this->connection = $AGM->getConnection($dsn);
+            } else {
+                $this->connection = $this->_connect(parse_url($dsn));
+                $AGM->setConnection($dsn, $this->connection);
+            }
         } else {
-            $this->connection_master = $this->_connect(parse_url($dsn_master));
+            $this->dsn_master = $dsn;
+            if($AGM->hasConnection($dsn)){
+                $this->connection_master = $AGM->getConnection($dsn);
+            } else {
+                $this->connection_master = $this->_connect(parse_url($dsn));
+                $AGM->setConnection($dsn, $this->connection_master);
+            }
         }
     }
 
@@ -124,18 +149,26 @@ abstract class ActiveGateway_Driver
     {
         $this->connection = NULL;
         $this->connection_master = NULL;
+        $AGM = ActiveGatewayManager::singleton();
+        $AGM->delConnection($this->dsn);
+        $AGM->delConnection($this->dsn_master);
     }
 
 
     /**
      * コネクションが確立されているのかどうか
      *
-     * @access     public
-     * @return     boolean
+     * @access  public
+     * @param   string  $target
+     * @return  boolean
      */
-    public function hasConnection()
+    public function hasConnection($target = 'master')
     {
-        return is_object($this->connection) && is_object($this->connection_master);
+        if($target == 'master'){
+            return $this->connection_master !== NULL;
+        } else {
+            return $this->connection !== NULL;
+        }
     }
 
 
@@ -148,10 +181,15 @@ abstract class ActiveGateway_Driver
      * @param      array   $params   ブレースフォルダ
      * @return     object  PDOステートメント
      */
-    public function query($sql, $params = array())
+    public function query($sql, $params = array(), $for_update = false)
     {
+        if($for_update) $sql = $this->modifyForUpdateQuery($sql);
+        if($this->_marker){
+            $sql .= ' #' . $this->_marker;
+            $this->_marker = '';
+        }
         //ステートメントの生成
-        if($this->_isUpdateQuery($sql)){
+        if($this->_isUpdateQuery($sql) || $this->_in_transaction){
             $stmt = $this->connection_master->prepare($sql);
         } else {
             $stmt = $this->connection->prepare($sql);
@@ -198,13 +236,14 @@ abstract class ActiveGateway_Driver
      * @param      int     $limit    取得数
      * @return     object  PDOステートメント
      */
-    public function limitQuery($sql, $params = array(), $offset = NULL, $limit = NULL)
+    public function limitQuery($sql, $params = array(), $offset = NULL, $limit = NULL, $for_update = false)
     {
         if($this->_isUpdateQuery($sql)){
             $sql = $this->modifyUpdateLimitQuery($sql, $limit);
         } else {
             $sql = $this->modifyLimitQuery($sql, $offset, $limit);
         }
+        if($for_update) $sql = $this->modifyForUpdateQuery($sql);
         return $this->query($sql, $params);
     }
 
@@ -249,6 +288,17 @@ abstract class ActiveGateway_Driver
             $this->_in_transaction = false;
             $this->connection_master->commit();
         }
+    }
+
+
+    /**
+     * トランザクション内かどうか
+     *
+     * @access     public
+     */
+    public function inTx()
+    {
+        return $this->_in_transaction;
     }
 
 
@@ -332,6 +382,15 @@ abstract class ActiveGateway_Driver
     abstract public function modifyFoundRowsQuery($sql);
 
     /**
+     * 行ロック用クエリー整形
+     *
+     * @access     public
+     * @param      string  $sql   SQL文
+     * @return     string  SQL文
+     */
+    abstract public function modifyForUpdateQuery($sql);
+
+    /**
      * インサート時に内容を調節する
      *
      * @access     public
@@ -367,6 +426,19 @@ abstract class ActiveGateway_Driver
 
 
     /**
+     * マーカーセット
+     *
+     * @access  public
+     * @param   string  $marker
+     */
+    public function setMarker($marker)
+    {
+        $this->_marker = $marker;
+    }
+
+
+
+    /**
      * 更新文かどうかの判断
      *
      * @access     protected
@@ -376,7 +448,8 @@ abstract class ActiveGateway_Driver
     protected function _isUpdateQuery($sql)
     {
         $sql = trim($sql);
-        return preg_match('/^(UPDATE|INSERT|BEGIN|ROLLBACK|COMMIT)/i', $sql);
+        return stripos($sql, 'UPDATE') === 0 || stripos($sql, 'INSERT') === 0 || stripos($sql, 'DELETE') === 0
+            || stripos($sql, 'BEGIN') === 0 || stripos($sql, 'COMMIT') === 0 || stripos($sql, 'COMMIT') === 0;
     }
 
 

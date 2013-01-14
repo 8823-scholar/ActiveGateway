@@ -2,7 +2,7 @@
 /**
  * PHP version 5.
  *
- * Copyright (c) 2007-2010, Samurai Framework Project, All rights reserved.
+ * Copyright (c) Samurai Framework Project, All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -27,20 +27,19 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * @package    ActiveGateway
- * @copyright  2007-2010 Samurai Framework Project
- * @link       http://samurai-fw.org/
- * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
- * @version    SVN: $Id$
+ * @package     ActiveGateway
+ * @copyright   Samurai Framework Project
+ * @link        http://samurai-fw.org/
+ * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 
 /**
  * ActiveGateway本体
  * 
- * @package    ActiveGateway
- * @copyright  2007-2010 Samurai Framework Project
- * @author     KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
- * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
+ * @package     ActiveGateway
+ * @copyright   Samurai Framework Project
+ * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
+ * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 class ActiveGateway
 {
@@ -143,14 +142,14 @@ class ActiveGateway
     /**
      * コネクト
      *
-     * @access     public
-     * @param      boolean $force
-     * @return     boolean 接続の可否
+     * @access  public
+     * @param   string  $target
+     * @return  boolean 接続の可否
      */
-    public function connect($force = false)
+    public function connect($target = 'master')
     {
         //接続済み
-        if(!$force && $this->hasConnection()){
+        if($this->hasConnection($target)){
             return true;
         }
         //DSNなし
@@ -158,7 +157,11 @@ class ActiveGateway
             trigger_error('[ActiveGateway]:DSN is Not Found.', E_USER_ERROR);
         }
         //新規接続
-        $this->Driver->connect($this->_dsn_slave, $this->_dsn_master);
+        if($target == 'master'){
+            $this->Driver->connect($target, $this->_dsn_master);
+        } else {
+            $this->Driver->connect($target, $this->_dsn_slave);
+        }
         return true;
     }
 
@@ -170,9 +173,7 @@ class ActiveGateway
      */
     public function disconnect()
     {
-        if($this->hasConnection()){
-            $this->Driver->disconnect();
-        }
+        $this->Driver->disconnect();
     }
 
 
@@ -260,6 +261,7 @@ class ActiveGateway
     public function findAll($alias, ActiveGatewayCondition $condition = NULL)
     {
         if(!$condition) $condition = ActiveGateway::getCondition();
+        $condition->total_rows = false;
         return $this->findAllDetail($alias, $condition);
     }
 
@@ -294,34 +296,22 @@ class ActiveGateway
     {
         //初期化
         $Record = $this->_buildRecord($alias);
-        if($condition->select === NULL) $condition->select = '*';
-        if($condition->from === NULL)   $condition->from   = $this->Driver->escapeColumn($Record->getTableName());
+        if($condition->from === NULL) $condition->from = $Record->getTableName();
         //自動付加
         $table_info = $this->getTableInfo($alias, $Record->getTableName());
-        if(isset($table_info['active']) && $condition->regard_active && !isset($condition->where->active)){
+        if(isset($table_info['active']) && $condition->regard_active && !$condition->hasKey('active')){
             $condition->where->active = '1';
         }
         
-        //セレクト節の生成
-        $select = (array)$condition->select;
-        //フロム節の調節
-        $from = (array)$condition->from;
-        //条件節の生成
-        $params = array();
-        $wheres = $this->_chain_where($condition->where, $params);
-        if($condition->addtional_where) $wheres[] = $condition->addtional_where;
-        //グループ節の生成
-        $groups = (array)$condition->group;
-        //オーダー節の生成
-        $orders = $this->_chain_order($condition->order);
+        //SQL生成
+        $sql = $this->makeSelectQuery($condition);
         
-        //SQL文の生成
-        $sql  = sprintf('SELECT %s FROM %s', join(', ', $select), join(', ', $from));
-        $sql .= ($wheres) ? sprintf(' WHERE %s', join(' AND ', $wheres)) : '' ;
-        $sql .= ($groups) ? sprintf(' GROUP BY %s', join(', ', $groups)) : '' ;
-        $sql .= ($orders) ? sprintf(' ORDER BY %s', join(', ', $orders)) : '' ;
         //SQLから検索
-        $result = $this->findAllSql($alias, $sql, $params, $condition->limit, $condition->offset, $condition->total_rows);
+        $this->Driver->setMarker($condition->marker);
+        $result = $this->findAllSql($alias, $sql, $condition->getParams(), $condition->getLimit(), $condition->offset,
+                                        $condition->total_rows, $condition->for_update);
+        $condition->clearParams();
+
         return $result;
     }
 
@@ -338,12 +328,15 @@ class ActiveGateway
      * @param      boolean $total_rows   総レコード数を取得するかどうか
      * @return     object  ActiveGatewayRecords
      */
-    public function findAllSql($alias, $sql, $params = array(), $limit = NULL, $offset = NULL, $total_rows = false)
+    public function findAllSql($alias, $sql, $params = array(), $limit = NULL, $offset = NULL,
+                                    $total_rows = false, $for_update = false)
     {
-        $Records = new ActiveGatewayRecords();
         if($total_rows) $sql = $this->Driver->modifyFoundRowsQuery($sql);
-        $res = $this->executeQuery($sql, $params, $limit, $offset);
+        $res = $this->executeQuery($sql, $params, $limit, $offset, $for_update);
         if($total_rows) $_total_rows = $this->Driver->getTotalRows($sql, $params);
+        
+        $Records = new ActiveGatewayRecords($res);
+        $Records->setAlias($alias);
         
         while($row = $res->fetch($this->_fetch_mode)){
             $Record = $this->_buildRecord($alias, $row, false);
@@ -480,7 +473,6 @@ class ActiveGateway
      */
     public function updateDetail($alias, ActiveGatewayCondition $condition, $attributes = array())
     {
-        $condition->setLimit(1);
         return $this->updateAllDetail($alias, $condition, $attributes);
     }
 
@@ -556,26 +548,15 @@ class ActiveGateway
         if($record->hasField('updated_at')){
             $attributes['updated_at'] = time();
         }
-        //設定節の生成
-        $sets = array();
-        foreach($attributes as $_key => $_val){
-            $place_holder = ":set_{$_key}";
-            $params[$place_holder] = $_val;
-            $sets[] = sprintf('`%s` = %s', $_key, $place_holder);
-        }
-        if(!$sets){
-            trigger_error('[ActiveGateway]:No attributes update is very danger!!', E_USER_ERROR);
-        }
-        //条件節の生成
-        $wheres = $this->_chain_where($condition->where, $params, 'where_');
-        if(!$wheres){
-            trigger_error('[ActiveGateway]:No where update is very danger!!', E_USER_ERROR);
-        }
-        //オーダー節の生成
-        $orders = $this->_chain_order($condition->order);
+
+        $condition->from = $record->getTableName();
+        $sql = $this->makeUpdateQuery($condition, $attributes);
+
         //SQLから更新
-        $sql = $this->Driver->modifyUpdateQuery($record->getTableName(), $sets, $wheres, $orders);
-        return $this->updateAllSql($sql, $params, $condition->limit);
+        $result = $this->updateAllSql($sql, $condition->getParams(), $condition->limit);
+        $condition->clearParams();
+
+        return $result;
     }
 
 
@@ -626,7 +607,6 @@ class ActiveGateway
      */
     public function deleteDetail($alias, ActiveGatewayCondition $condition)
     {
-        $condition->setLimit(1);
         return $this->deleteAllDetail($alias, $condition);
     }
 
@@ -651,17 +631,11 @@ class ActiveGateway
         }
         //物理消去
         else {
-            //条件節の生成
-            $params = array();
-            $wheres = $this->_chain_where($condition->where, $params);
-            if(!$wheres){
-                trigger_error('[ActiveGateway]:No where delete is very danger!!', E_USER_ERROR);
-            }
-            //オーダー節の生成
-            $orders = $this->_chain_order($condition->order);
-            //SQLから更新
-            $sql = $this->Driver->modifyDeleteQuery($Record->getTableName(), $wheres, $orders);
-            return $this->updateAllSql($sql, $params, $condition->limit);
+            $condition->from = $record->getTableName();
+            $sql = $this->makeDeleteQuery($condition);
+            $result = $this->updateAllSql($sql, $condition->getParams(), $condition->limit);
+            $condition->clearParams();
+            return $result;
         }
     }
 
@@ -733,9 +707,34 @@ class ActiveGateway
         if(isset($this->_table_info[$alias])){
             return $this->_table_info[$alias];
         }
+
+        //キャッシュファイルを検索
+        /*
+        $cachable = false;
+        if ( $cachable ) {
+            $cdir = 'temp/scheme_cache';
+            if(!is_dir($cdir)){
+                mkdir($cdir);
+                chmod($cdir, 0777);
+            }
+            $cfile = $cdir . '/' . $table_name . '.scheme';
+            if(file_exists($cfile)){
+                $info = unserialize(file_get_contents($cfile));
+                $this->_table_info[$alias] = $info;
+                return $info;
+            }
+        }
+         */
+
         //情報の取得
-        $this->connect();
+        $this->connect('slave');
         $attributes = $this->Driver->getTableInfo($table_name);
+        /*
+        if($cachable){
+            file_put_contents($cfile, serialize($attributes));
+            chmod($cfile, 0777);
+        }
+         */
         //情報の代入
         $this->_table_info[$alias] = $attributes;
         return $this->_table_info[$alias];
@@ -764,8 +763,9 @@ class ActiveGateway
             return true;
         //既存レコードの場合
         } else {
-            if($record->getAttributes(true)){
-                $this->update($record->getAlias(), $record->getOriginalValue('primary_key'), $record->getAttributes(true));
+            if($attributes = $record->getAttributes(true)){
+                $this->update($record->getAlias(), $record->getOriginalValue('primary_key'), $attributes);
+                $record->onSaved();
             }
             return true;
         }
@@ -822,13 +822,13 @@ class ActiveGateway
      * @param      int     $offset   開始位置
      * @return     object  PDOステートメント
      */
-    public function executeQuery($sql, $params = array(), $limit = NULL, $offset = NULL)
+    public function executeQuery($sql, $params = array(), $limit = NULL, $offset = NULL, $for_update = false)
     {
-        $this->connect();
+        $this->connect('slave');
         if($limit !== NULL || $offset !== NULL){
-            $stmt = $this->Driver->limitQuery($sql, $params, $offset, $limit);
+            $stmt = $this->Driver->limitQuery($sql, $params, $offset, $limit, $for_update);
         } else {
-            $stmt = $this->Driver->query($sql, $params);
+            $stmt = $this->Driver->query($sql, $params, $for_update);
         }
         
         return $stmt;
@@ -846,9 +846,9 @@ class ActiveGateway
      */
     public function executeUpdate($sql, $params = array(), $limit = NULL)
     {
-        $this->connect();
+        $this->connect('master');
         if($limit !== NULL){
-            $stmt = $this->Driver->limitQuery($sql, $params, NULL, $limit);
+            $stmt = $this->Driver->limitQuery($sql, $params, NULL, $limit); 
         } else {
             $stmt = $this->Driver->query($sql, $params);
         }
@@ -867,7 +867,7 @@ class ActiveGateway
      */
     public function tx($name = NULL)
     {
-        $this->connect();
+        $this->connect('master');
         $this->Driver->tx($name);
     }
 
@@ -879,7 +879,7 @@ class ActiveGateway
      */
     public function rollback($name = NULL)
     {
-        $this->connect();
+        $this->connect('master');
         $this->Driver->rollback($name);
     }
 
@@ -891,7 +891,7 @@ class ActiveGateway
      */
     public function commit($name = NULL)
     {
-        $this->connect();
+        $this->connect('master');
         $this->Driver->commit($name);
     }
 
@@ -925,7 +925,7 @@ class ActiveGateway
     public function getRow($sql, $params = array())
     {
         $stmt = $this->executeQuery($sql, $params, 1);
-        $row  = $stmt->fetchAll($this->_fetch_mode);
+        $row  = $stmt->fetch($this->_fetch_mode);
         return $row;
     }
 
@@ -1039,7 +1039,7 @@ class ActiveGateway
      * @access     public
      * @return     object   ActiveGatewayCondition
      */
-    public function getCondition()
+    public static function getCondition()
     {
         $condition = new ActiveGatewayCondition();
         return $condition;
@@ -1049,12 +1049,13 @@ class ActiveGateway
     /**
      * コネクションを保持しているかどうか
      *
-     * @access     public
-     * @return     boolean
+     * @access  public
+     * @param   string  $taregt
+     * @return  boolean
      */
-    public function hasConnection()
+    public function hasConnection($target = 'master')
     {
-        return $this->Driver->hasConnection();
+        return $this->Driver->hasConnection($target);
     }
 
 
@@ -1067,6 +1068,130 @@ class ActiveGateway
     public function hasDsn()
     {
         return $this->_dsn_slave && $this->_dsn_master;
+    }
+    
+    
+    /**
+     * トランザクション内かどうか
+     *
+     * @access     public
+     * @return     boolean
+     */
+    public function inTx()
+    {
+        return $this->Driver->inTx();
+    }
+
+
+
+
+
+
+
+    /**
+     * SELECT文を作成
+     *
+     * @access  public
+     * @param   object  $cond   ActiveGatewayCondition
+     * @return  string
+     */
+    public function makeSelectQuery(ActiveGatewayCondition $cond)
+    {
+        $sql = array();
+        $selects = (array)$cond->select;
+        $selects = $this->_chain_select($selects);
+        $sql[] = sprintf('SELECT %s FROM %s', join(', ', $selects), $this->Driver->escapeColumn($cond->from));
+        if($cond->where->has()){
+            if($cond->addtional_where) $cond->where->append($cond->isNative($cond->addtional_where));
+            $sql[] = sprintf('WHERE %s', $cond->where->build($this->Driver));
+        }
+
+        $groups = (array)$cond->group;
+        $groups = $this->_chain_group($cond->group);
+        if($groups) $sql[] = sprintf('GROUP BY %s', join(', ', $groups));
+
+        $orders = $this->_chain_order($cond->order);
+        if($orders) $sql[] = sprintf('ORDER BY %s', join(', ', $orders));
+
+        return join(' ', $sql);
+    }
+
+
+    /**
+     * UPDATE文を作成
+     *
+     * @access  public
+     * @param   object  $cond   ActiveGatewayCondition
+     * @param   array   $attributes
+     * @return  string
+     */
+    public function makeUpdateQuery(ActiveGatewayCondition $cond, $attributes = array())
+    {
+        $sql = array();
+        $sql[] = sprintf('UPDATE %s SET', $this->Driver->escapeColumn($cond->from));
+        $sets = array();
+        foreach($attributes as $_key => $_val){
+            $bindkey = $cond->addParam($_val);
+            $sets[] = sprintf('%s = %s', $this->Driver->escapeColumn($_key), $bindkey);
+        }
+        $sql[] = join(', ', $sets);
+        if($cond->where->has()){
+            $sql[] = sprintf('WHERE %s', $cond->where->build($this->Driver));
+        } else {
+            throw new Samurai_Exception('No condition update is very danger!!');
+        }
+
+        $orders = $this->_chain_order($cond->order);
+        if($orders) $sql[] = sprintf('ORDER BY %s', join(', ', $orders));
+
+        return join(' ', $sql);
+    }
+
+
+    /**
+     * DELETE文を作成
+     *
+     * @access  public
+     * @param   object  $cond   ActiveGatewayCondition
+     * @param   array   $attributes
+     * @return  string
+     */
+    public function makeDeleteQuery(ActiveGatewayCondition $cond)
+    {
+        $sql = array();
+        $sql[] = sprintf('DELETE FROM %s', $this->Driver->escapeColumn($cond->from));
+        if($cond->where->has()){
+            $sql[] = sprintf('WHERE %s', $cond->where->build($this->Driver));
+        } else {
+            throw new Samurai_Exception('No condition delete is very danger!!');
+        }
+
+        $orders = $this->_chain_order($cond->order);
+        if($orders) $sql[] = sprintf('ORDER BY %s', join(', ', $orders));
+
+        return join(' ', $sql);
+    }
+
+
+
+
+
+    /**
+     * SELECT句を連結する
+     *
+     * @access     private
+     * @param      mixed   $select
+     * @return     array
+     */
+    private function _chain_select($select)
+    {
+        $return = array();
+        if(!$select){
+            $return[] = '*';
+        } else {
+            $return = (array)$select;
+        }
+        return $return;
     }
 
 
@@ -1111,8 +1236,19 @@ class ActiveGateway
                             $return[] = sprintf('%s %s %s', $this->Driver->escapeColumn($column_key), $_val->operator, $place_holder);
                         }
                     } elseif($_val instanceof ActiveGatewayCondition_Values){
-                        $sub_wheres = $this->_chain_where($_val->values, $params, $prefix . $_key . '_', $column_key);
-                        $return[] = sprintf('( %s )', join(sprintf(' %s ', $_val->operator), $sub_wheres));
+                        if($_val->operator === 'IN' || $_val->operator === 'NOT IN'){
+                            $_in = array();
+                            foreach($_val->values as $_i => $_val2){
+                                $place_holder = ':' . $prefix . $_key . $_i;
+                                $_in[] = $place_holder;
+                                $params[$place_holder] = $_val2;
+                            }
+                            $return[] = sprintf('%s %s (%s)',
+                                $this->Driver->escapeColumn($column_key), $_val->operator, join(',', $_in));
+                        } else {
+                            $sub_wheres = $this->_chain_where($_val->values, $params, $prefix . $_key . '_', $column_key);
+                            $return[] = sprintf('( %s )', join(sprintf(' %s ', $_val->operator), $sub_wheres));
+                        }
                     }
                     break;
                 }
@@ -1134,10 +1270,37 @@ class ActiveGateway
         $return = array();
         if($order){
             if(is_string($order)){
-                $return[] = preg_match('/\(\)/', $order) ? $order : $this->Driver->escapeColumn($order);
+                $return[] = preg_match('/\(.*?\)/', $order) ? $order : $this->Driver->escapeColumn($order);
             } else {
                 foreach($order as $_key => $_val){
-                    $return[] = sprintf('%s %s', $this->Driver->escapeColumn($_key), $_val);
+                    if($_val !== NULL){
+                        $return[] = sprintf('%s %s',
+                            preg_match('/\(.*?\)/', $_key) ? $_key : $this->Driver->escapeColumn($_key), $_val);
+                    } else {
+                        $return[] = preg_match('/\(.*?\)/', $_key) ? $_key : $this->Driver->escapeColumn($_key);
+                    }
+                }
+            }
+        }
+        return $return;
+    }
+
+
+    /**
+     * GRUP条件を連結する
+     *
+     * @access     private
+     * @return     array
+     */
+    private function _chain_group($group)
+    {
+        $return = array();
+        if($group){
+            if(is_string($group)){
+                $return[] = $this->Driver->escapeColumn($group);
+            } else {
+                foreach($group as $_val){
+                    $return[] = $this->Driver->escapeColumn($_val);
                 }
             }
         }

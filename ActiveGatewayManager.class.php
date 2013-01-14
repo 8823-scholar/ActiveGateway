@@ -2,7 +2,7 @@
 /**
  * PHP version 5.
  *
- * Copyright (c) 2007-2010, Samurai Framework Project, All rights reserved.
+ * Copyright (c) Samurai Framework Project, All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -27,11 +27,10 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * @package    ActiveGateway
- * @copyright  2007-2010 Samurai Framework Project
- * @link       http://samurai-fw.org/
- * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
- * @version    SVN: $Id$
+ * @package     ActiveGateway
+ * @copyright   Samurai Framework Project
+ * @link        http://samurai-fw.org/
+ * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 
 require_once dirname(__FILE__) . '/ActiveGateway.class.php';
@@ -40,16 +39,18 @@ require_once dirname(__FILE__) . '/ActiveGatewayRecords.class.php';
 require_once dirname(__FILE__) . '/ActiveGatewayCondition.class.php';
 require_once dirname(__FILE__) . '/ActiveGatewayUtils.class.php';
 require_once dirname(__FILE__) . '/Driver/Driver.abstract.php';
+require_once dirname(__FILE__) . '/Exception/ConnectionFailed.class.php';
+
 
 /**
  * ActiveGatewayの取得、設定情報の管理などを行うクラス
  *
  * このクラスはsingletonで動作する。
  * 
- * @package    ActiveGateway
- * @copyright  2007-2010 Samurai Framework Project
- * @author     KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
- * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
+ * @package     ActiveGateway
+ * @copyright   Samurai Framework Project
+ * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
+ * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 class ActiveGatewayManager
 {
@@ -101,6 +102,13 @@ class ActiveGatewayManager
      */
     private static $_querys = array();
 
+    /**
+     * DSNとコネクションの管理
+     *
+     * @access  private
+     * @var     array
+     */
+    private $_connections = array();
 
     /**
      * コンストラクタ
@@ -119,7 +127,7 @@ class ActiveGatewayManager
      * @access     public
      * @return     object  ActiveGatewayManager
      */
-    public function singleton()
+    public static function singleton()
     {
         if(self::$_instance === NULL){
             self::$_instance = new ActiveGatewayManager();
@@ -302,6 +310,57 @@ class ActiveGatewayManager
 
 
     /**
+     * 指定のDSNのコネクションを既に保持しているかどうか
+     *
+     * @acess   public
+     * @param   string  $dsn
+     * @return  boolean
+     */
+    public function hasConnection($dsn)
+    {
+        return isset($this->_connections[$dsn]);
+    }
+
+    /**
+     * 指定のDSNのコネクションを追加する
+     *
+     * @access  public
+     * @param   string  $dsn
+     * @param   resource
+     */
+    public function setConnection($dsn, $connection)
+    {
+        $this->_connections[$dsn] = $connection;
+    }
+
+    /**
+     * 指定のDSNのコネクションを取得する
+     *
+     * @access  public
+     * @param   string  $dsn
+     * @return  resource
+     */
+    public function getConnection($dsn)
+    {
+        return $this->_connections[$dsn];
+    }
+
+    /**
+     * コネクションを削除
+     *
+     * @access  public
+     * @param   string  $dsn
+     */
+    public function delConnection($dsn)
+    {
+        if(isset($this->_connections[$dsn])){
+            unset($this->_connections[$dsn]);
+        }
+    }
+
+
+
+    /**
      * 実行クエリーのプール
      *
      * @access     public
@@ -322,7 +381,7 @@ class ActiveGatewayManager
      * @access     public
      * @return     array
      */
-    public function getPoolQuery()
+    public static function getPoolQuery()
     {
         return self::$_querys;
     }

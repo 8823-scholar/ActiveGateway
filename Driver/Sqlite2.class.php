@@ -31,7 +31,7 @@
  * @copyright  2007-2010 Samurai Framework Project
  * @link       http://samurai-fw.org/
  * @license    http://www.opensource.org/licenses/bsd-license.php The BSD License
- * @version    SVN: $Id$
+ * @version    SVN: $Id: 2fb1b5f8d3645a7faa1b1bb77c10fc4a8d113564 $
  */
 
 /**
