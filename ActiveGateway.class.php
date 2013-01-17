@@ -34,7 +34,7 @@
  */
 
 /**
- * ActiveGateway本体
+ * ActiveGateway.
  * 
  * @package     ActiveGateway
  * @copyright   Samurai Framework Project
@@ -44,20 +44,20 @@
 class ActiveGateway
 {
     /**
-     * DSN(スレーブ)
+     * DSN
      *
-     * @access   private
-     * @var      string
+     * @access  private
+     * @var     string
      */
-    private $_dsn_slave = '';
+    private $_dsn;
 
     /**
-     * DSN(マスター)
+     * DSN for slave.
      *
-     * @access   private
-     * @var      string
+     * @access  private
+     * @var     string
      */
-    private $_dsn_master = '';
+    private $_dsn_slave;
 
     /**
      * 設定情報
@@ -90,6 +90,15 @@ class ActiveGateway
      * @var      array
      */
     private $_table_info = array();
+
+    /**
+     * backend type.
+     * mysql, pgsql, sqlite or other.
+     *
+     * @access  private
+     * @var     string
+     */
+    private $_backend_type = 'mysql';
 
     /**
      * Driverインスタンス
@@ -128,14 +137,37 @@ class ActiveGateway
     const FETCH_BOTH = PDO::FETCH_BOTH;
 
 
+
     /**
-     * コンストラクタ
+     * constructor.
      *
-     * @access     public
+     * @access  public
      */
     public function __construct()
+    {   
+    }
+
+
+    /**
+     * set DSN.
+     *
+     * @access  public
+     * @param   string  $dsn
+     */
+    public function setDsn($dsn)
     {
-        
+        $this->_dsn = $dsn;
+    }
+
+    /**
+     * set DSN for slave.
+     *
+     * @access  public
+     * @param   string  $dsn
+     */
+    public function setDsnSlave($dsn)
+    {
+        $this->_dsn_slave = $dsn;
     }
 
 
@@ -982,28 +1014,6 @@ class ActiveGateway
 
 
 
-    /**
-     * DSNの設定
-     *
-     * @access     public
-     * @param      string  $dsn   DSN情報文字列
-     */
-    public function setDsn($dsn)
-    {
-        $this->_dsn_slave = $dsn;
-        if(!$this->_dsn_master) $this->setDsnMaster($dsn);
-    }
-
-    /**
-     * DSNの設定(マスター)
-     *
-     * @access     public
-     * @param      string  $dsn   DSN情報文字列
-     */
-    public function setDsnMaster($dsn)
-    {
-        $this->_dsn_master = $dsn;
-    }
 
 
     /**
@@ -1305,6 +1315,32 @@ class ActiveGateway
             }
         }
         return $return;
+    }
+
+
+
+
+
+    /**
+     * get backend type.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function getBackendType()
+    {
+        return $this->_backend_type;
+    }
+
+    /**
+     * set backend type.
+     *
+     * @access  public
+     * @param   string  $type
+     */
+    public function setBackendType($type)
+    {
+        $this->_backend_type = $type;
     }
 }
 

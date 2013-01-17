@@ -33,42 +33,34 @@
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 
-require_once dirname(__FILE__) . '/ActiveGateway.class.php';
-require_once dirname(__FILE__) . '/ActiveGatewayRecord.class.php';
-require_once dirname(__FILE__) . '/ActiveGatewayRecords.class.php';
-require_once dirname(__FILE__) . '/ActiveGatewayCondition.class.php';
-require_once dirname(__FILE__) . '/ActiveGatewayUtils.class.php';
-require_once dirname(__FILE__) . '/Driver/Driver.abstract.php';
-require_once dirname(__FILE__) . '/Exception/ConnectionFailed.class.php';
+require_once dirname(__DIR__) . '/ActiveGateway.class.php';
+require_once dirname(__DIR__) . '/ActiveGatewayRecord.class.php';
+require_once dirname(__DIR__) . '/ActiveGatewayRecords.class.php';
+require_once dirname(__DIR__) . '/ActiveGatewayCondition.class.php';
+require_once __DIR__ . '/Utils.class.php';
+require_once __DIR__ . '/Driver.abstract.php';
+require_once __DIR__ . '/Exception.class.php';
 
 
 /**
- * ActiveGatewayの取得、設定情報の管理などを行うクラス
- *
- * このクラスはsingletonで動作する。
+ * Management ActiveGateway instance, all connection, and others.
+ * 
+ * This class is singleton.
  * 
  * @package     ActiveGateway
  * @copyright   Samurai Framework Project
  * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
-class ActiveGatewayManager
+class ActiveGateway_Manager
 {
     /**
-     * DSN(スレーブ)情報を保持
+     * config.
      *
-     * @access   private
-     * @var      array
+     * @access  private
+     * @var     array
      */
-    private $_dsn_slave = array();
-
-    /**
-     * DSN(マスター)情報を保持
-     *
-     * @access   private
-     * @var      array
-     */
-    private $_dsn_master = array();
+    private $_config = array();
 
     /**
      * 設定ファイル保持
@@ -87,7 +79,7 @@ class ActiveGatewayManager
     private $_active_gateways = array();
 
     /**
-     * 自身のインスタンス
+     * self instance.
      *
      * @access   private
      * @var      object
@@ -110,42 +102,42 @@ class ActiveGatewayManager
      */
     private $_connections = array();
 
+
     /**
-     * コンストラクタ
+     * constructor.
      *
      * @access     private
      */
     private function __construct()
     {
-        
     }
 
 
+
     /**
-     * ActiveGatewayManagerインスタンスの返却
+     * get instance (singleton).
      *
-     * @access     public
-     * @return     object  ActiveGatewayManager
+     * @access  public
+     * @return  ActiveGateway_Manager
      */
     public static function singleton()
     {
-        if(self::$_instance === NULL){
-            self::$_instance = new ActiveGatewayManager();
+        if ( self::$_instance === NULL ) {
+            self::$_instance = new ActiveGateway_Manager();
         }
         return self::$_instance;
     }
 
 
     /**
-     * 設定ファイルを読み込む
+     * load config.
      *
-     * @access     public
-     * @param      string  $config_file   設定ファイル
+     * @access  public
+     * @param   string  $config_file
      */
     public function import($config_file)
     {
-        $config = ActiveGatewayUtils::loadYaml($config_file);
-        //情報のセット
+        $config = ActiveGateway_Utils::loadYaml($config_file);
         foreach($config as $alias => $_val){
             $this->setConfig($alias, $_val);
         }
@@ -153,142 +145,91 @@ class ActiveGatewayManager
 
 
     /**
-     * 設定をセットする
+     * set config.
      *
-     * @access     public
-     * @param      string  $alias
-     * @param      array   $config
+     * @access  public
+     * @param   string  $alias
+     * @param   array   $config
      */
     public function setConfig($alias, array $config)
     {
-        //スレーブのセット
-        if(isset($config['dsn']) && $config['dsn']){
-            $this->_dsn_slave[$alias] = $config['dsn'];
-        }
-        //マスターのセット
-        if(isset($config['dsn_master']) && $config['dsn_master']){
-            $this->_dsn_master[$alias] = $config['dsn_master'];
-        } else {
-            $this->_dsn_master[$alias] = $this->_dsn_slave[$alias];
-        }
-        //confファイルの決定
-        if(isset($config['conf']) && $config['conf']){
-            if(!isset($this->_config_files[$alias])){
-                $this->_config_files[$alias] = $config['conf'];
-            } else {
-                $this->_config_files[$alias] = array_merge($this->_config_files[$alias], $config['conf']);
-            }
-        }
+        $this->_config[$alias] = $config;
     }
 
 
 
     /**
-     * ActiveGatewayの取得
+     * get ActiveGateway instance.
      *
-     * DSN文字列から、該当するドライバーを選択し、インスタンス化したのち返却する。
-     *
-     * @access     public
-     * @param      string  $alias   対象DSNのエイリアス名
-     * @return     object  ActiveGateway
+     * @access  public
+     * @param   string  $alias
+     * @return  ActiveGateway
      */
     public function getActiveGateway($alias)
     {
-        //静的参照許可
-        if(!is_object($this) || !$this instanceof ActiveGatewayManager){
-            $Manager = ActiveGatewayManager::singleton();
-            return $Manager->getActiveGateway($alias);
-        }
-        //既に作成済みの場合
-        if($this->hasActiveGateway($alias)){
+        // already make instance.
+        if ( $this->hasActiveGateway($alias) ) {
             return $this->_active_gateways[$alias];
         }
-        //新規作成
-        elseif($this->hasDsn($alias)){
-            $ActiveGateway = $this->makeActiveGateway($this->_pick($this->_dsn_slave[$alias]),
-                                            $this->_pick($this->_dsn_master[$alias]),
-                                            isset($this->_config_files[$alias]) ? $this->_config_files[$alias] : "");
+
+        // new.
+        if ( $this->hasDsn($alias) ) {
+            $ActiveGateway = $this->makeActiveGateway($alias);
             $this->_active_gateways[$alias] = $ActiveGateway;
             return $ActiveGateway;
-        //不正
         } else {
-            trigger_error("[ActiveGatewayManager]:DSN is Not Found -> {$alias}", E_USER_ERROR);
+            throw new ActiveGateway_Exception('dsn is not found. -> ' . $alias);
         }
     }
 
 
     /**
-     * ActiveGatewayを作成する
+     * make activegateway instance.
      *
-     * @access     public
-     * @param      string  $dsn_slave    DSN(スレーブ)
-     * @param      string  $dsn_master   DSN(マスター)
-     * @param      string  $conf_file    設定ファイルパス
-     * @return     object  ActiveGatewayインスタンス
+     * @access  public
+     * @param   string  $alias
+     * @return  ActiveGateway
      */
-    public function makeActiveGateway($dsn_slave, $dsn_master = NULL, $conf_file = '')
+    public function makeActiveGateway($alias)
     {
-        //ActiveGatewayの生成
+        // make.
+        $config = $this->_config[$alias];
         $ActiveGateway = new ActiveGateway();
-        $ActiveGateway->setDsn($dsn_slave);
-        $ActiveGateway->setDsnMaster($dsn_master !== NULL ? $dsn_master : $dsn_slave);
-        $ActiveGateway->import($conf_file);
-        //ドライバーの生成
-        $driver_name = $this->_getDriverName($dsn_slave);
-        $driver_file = $this->_getDriverFile($dsn_slave);
-        if(file_exists($driver_file)){
-            include_once($driver_file);
+
+        // dsn.
+        $dsn = $config['dsn'];
+        $ActiveGateway->setDsn($dsn);
+        if ( isset($config['slaves']) ) {
+            $ActiveGateway->setDsnSlave($this->_pickSlave($config['slaves']));
+        }
+
+        // conf
+        if ( isset($config['conf']) ) {
+            $ActiveGateway->import($config['conf']);
+        }
+
+        // backend.
+        $type = $this->_getBackendType($dsn);
+        $driver_name = $this->_getDriverName($type);
+        $driver_file = $this->_getDriverFile($type);
+        if ( file_exists($driver_file) ) {
+            require_once $driver_file;
             $Driver = new $driver_name();
-            if(is_object($Driver)){
-                $ActiveGateway->setDriver($Driver);
-            } else {
-                trigger_error("[ActiveGatewayManager]:Driver generate failed... -> {$driver_file}", E_USER_ERROR);
-            }
+            $ActiveGateway->setBackendType($type);
+            $ActiveGateway->setDriver($Driver);
         } else {
-            trigger_error("[ActiveGatewayManager]:Driver is Not Found -> {$driver_file}", E_USER_ERROR);
+            throw new ActiveGateway_Exception('driver is not found. -> ' . $type);
         }
         return $ActiveGateway;
     }
 
 
     /**
-     * Driverのクラス名取得
+     * has activegateway instance.
      *
-     * @access     private
-     * @param      string  $dsn   DSN情報
-     * @return     string
-     */
-    private function _getDriverName($dsn)
-    {
-        $dsn_info = parse_url($dsn);
-        if(isset($dsn_info['scheme']) && $dsn_info['scheme']){
-            return 'ActiveGateway_Driver_' . ucfirst($dsn_info['scheme']);
-        } else {
-            trigger_error("[ActiveGatewayManager]:DSN is invalid format. -> {$dsn}", E_USER_ERROR);
-        }
-    }
-
-
-    /**
-     * Driverのファイル名取得
-     *
-     * @access     private
-     * @param      string  $dsn   DSN情報
-     * @return     string
-     */
-    private function _getDriverFile($dsn)
-    {
-        $driver_name = $this->_getDriverName($dsn);
-        return sprintf('%s/Driver/%s.class.php', dirname(__FILE__), preg_replace('/^ActiveGateway_Driver_/', '', $driver_name));
-    }
-
-
-    /**
-     * ActiveGatewayを既に保持しているかどうか
-     *
-     * @access     public
-     * @param      string  $alias   Alias名
-     * @return     boolean
+     * @access  public
+     * @param   string  $alias
+     * @return  boolean
      */
     public function hasActiveGateway($alias)
     {
@@ -297,15 +238,17 @@ class ActiveGatewayManager
 
 
     /**
-     * DSN情報を保持しているかどうか
+     * has dsn info.
      *
-     * @access     public
-     * @param      string  $alias   Alias名
-     * @return     boolean
+     * @access  public
+     * @param   string  $alias
+     * @return  boolean
      */
     public function hasDsn($alias)
     {
-        return isset($this->_dsn_slave[$alias]) && $this->_dsn_slave[$alias];
+        if ( ! isset($this->_config[$alias]) ) return false;
+        if ( ! isset($this->_config[$alias]['dsn']) ) return false;
+        return true;
     }
 
 
@@ -398,24 +341,6 @@ class ActiveGatewayManager
 
 
     /**
-     * 配列からランダムにピック
-     * 配列でない場合はそのまま返却
-     *
-     * @access     private
-     * @param      mixed   $array
-     * @return     mixed
-     */
-    private function _pick($array)
-    {
-        if(is_array($array)){
-            return $array[array_rand($array)];
-        } else {
-            return $array;
-        }
-    }
-
-
-    /**
      * 全ての接続を確立しなおす
      *
      * forkした際、子プロセスの終了時に接続が全て切られてしまうため、
@@ -440,6 +365,97 @@ class ActiveGatewayManager
         foreach($this->_active_gateways as $AG){
             $AG->disconnect();
         }
+    }
+
+
+
+
+
+    /**
+     * get helper by ActiveGateway.
+     *
+     * @access  public
+     * @param   ActiveGateway   $AG
+     * @return  ActiveGateway_Helper
+     */
+    public function getHelper(ActiveGateway $AG)
+    {
+        static $helpers = array();
+        
+        $type = $AG->getBackendType();
+        if ( isset($helpers[$type]) ) {
+            return $helpers[$type];
+        }
+
+        $class_name = 'ActiveGateway_Helper_' . ucfirst($type);
+        $class_file = __DIR__ . '/Helper/' . ucfirst($type) . '.class.php';
+        if ( file_exists($class_file) ) {
+            require_once $class_file;
+            $helper = new $class_name();
+        } else {
+            require_once __DIR__ . '/Helper.class.php';
+            $helper = new ActiveGateway_Helper();
+        }
+        $helpers[$type] = $helper;
+        return $helper;
+    }
+
+
+    /**
+     * pick a slave config.
+     *
+     * @access  private
+     * @param   array   $slaves
+     * @return  string
+     */
+    private function _pickSlave(array $slaves = array())
+    {
+        if ( ! $slaves ) return NULL;
+        $config = $slaves[array_rand($slaves)];
+        return $config['dsn'];
+    }
+
+
+    /**
+     * get backend type.
+     *
+     * @access  private
+     * @param   string  $dsn
+     * @return  string
+     */
+    private function _getBackendType($dsn)
+    {
+        $info = parse_url($dsn);
+        if ( isset($info['scheme']) && $info['scheme'] ) {
+            return $info['scheme'];
+        } else {
+            throw new ActiveGateway_Exception('not found scheme from dsn. -> dsn: ' . $dsn);
+        }
+    }
+
+
+    /**
+     * get driver class name.
+     *
+     * @access  private
+     * @@aram   string  $backend_type
+     * @return  string
+     */
+    private function _getDriverName($backend_type)
+    {
+        return 'ActiveGateway_Driver_' . ucfirst($backend_type);
+    }
+
+    /**
+     * get driver class file.
+     *
+     * @access  private
+     * @@aram   string  $backend_type
+     * @return  string
+     */
+    private function _getDriverFile($backend_type)
+    {
+        return sprintf('%s/Driver/%s.class.php', __DIR__, ucfirst($backend_type));
     }
 }
 

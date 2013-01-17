@@ -47,7 +47,7 @@
 abstract class ActiveGateway_Driver
 {
     /**
-     * コネクション
+     * connection
      *
      * @access   protected
      * @var      resource
@@ -55,7 +55,7 @@ abstract class ActiveGateway_Driver
     protected $connection;
 
     /**
-     * コネクションマスタ
+     * connection of master.
      *
      * @access   protected
      * @var      resource
@@ -72,23 +72,16 @@ abstract class ActiveGateway_Driver
     protected $dsn_master;
 
     /**
-     * トランザクション内かどうか
+     * in transcation flag.
      *
      * @access   protected
      * @var      boolean
      */
     protected $_in_transaction = false;
 
+    
     /**
-     * マーカー
-     *
-     * @access  protected
-     */
-    protected $_marker = '';
-
-
-    /**
-     * コンストラクタ
+     * constructor.
      *
      * @access     public
      */
@@ -141,7 +134,7 @@ abstract class ActiveGateway_Driver
 
 
     /**
-     * 切断
+     * disconnect.
      *
      * @access     public
      */
@@ -149,7 +142,7 @@ abstract class ActiveGateway_Driver
     {
         $this->connection = NULL;
         $this->connection_master = NULL;
-        $AGM = ActiveGatewayManager::singleton();
+        $AGM = ActiveGateway_Manager::singleton();
         $AGM->delConnection($this->dsn);
         $AGM->delConnection($this->dsn_master);
     }

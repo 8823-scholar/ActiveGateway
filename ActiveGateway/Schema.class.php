@@ -34,15 +34,119 @@
  */
 
 /**
- * Exception: Connection failed.
- *
+ * schema class.
+ * 
  * @package     ActiveGateway
- * @subpackage  Exception
+ * @subpackage  Schema
  * @copyright   Samurai Framework Project
  * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
-class ActiveGateway_Exception_ConnectionFailed extends Exception
+class ActiveGateway_Schema
 {
+    /**
+     * database alias
+     *
+     * @access  private
+     * @var     string
+     */
+    private $_alias = 'base';
+
+    /**
+     * version
+     *
+     * @access  private
+     * @var     int
+     */
+    private $_version = 0;
+
+    /**
+     * defined list.
+     *
+     * @access  private
+     * @var     array
+     */
+    private $_defines = array();
+
+
+    /**
+     * const: column types 
+     *
+     * @const
+     */
+    const COLUMN_TYPE_STRING = 'string';
+
+
+    /**
+     * constructor.
+     *
+     * @access  public
+     * @param   string  $alias
+     */
+    public function __construct($alias)
+    {
+        $this->_alias = $alias;
+    }
+
+
+
+    /**
+     * get alias.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function getAlias()
+    {
+        return $this->_alias;
+    }
+
+
+    /**
+     * set version.
+     *
+     * @access  public
+     * @param   int     $version
+     */
+    public function setVersion($version)
+    {
+        $this->_version = $version;
+    }
+
+
+
+    /**
+     * get defined list.
+     *
+     * @access  public
+     * @return  array
+     */
+    public function getDefines()
+    {
+        return $this->_defines;
+    }
+
+
+
+
+    /**
+     * create table.
+     * not apply into database immediately.
+     *
+     * @access  public
+     * @param   string  $name
+     * @return  ActiveGateway_Schema_Table
+     */
+    public function createTable($name)
+    {
+        $table = new ActiveGateway_Schema_Table($name);
+        $table->setSchema($this);
+        $this->_defines[] = $table;
+
+        // conversion: id is exists.
+        $table->column('id')->type('int', 11)->primary();
+
+        return $table;
+    }
 }
 

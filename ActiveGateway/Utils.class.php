@@ -34,40 +34,34 @@
  */
 
 /**
- * ActiveGatewayの雑務クラス
+ * Utility class for ActiveGateway.
  * 
  * @package     ActiveGateway
  * @copyright   Samurai Framework Project
  * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
-class ActiveGatewayUtils
+class ActiveGateway_Utils
 {
     /**
-     * コンストラクタ
+     * constructor.
      *
      * @access     private
      */
     private function __construct()
     {
-        
     }
 
 
     /**
-     * YAMLのロードを行う
+     * load YAML.
      *
-     * @access     public
-     * @return     array   読み込み結果
+     * @access  public
+     * @param   string  $yaml_file
+     * @return  array
      */
     public static function loadYaml($yaml_file)
     {
-        //Samurai_Yamlの検索
-        /*
-        if(class_exists('Samurai_Yaml')){
-            $config = Samurai_Yaml::load($yaml_file);
-        } else
-        */
         if(file_exists($yaml_file)){
             //syckエクステンションの検索
             if(function_exists('syck_load')){
