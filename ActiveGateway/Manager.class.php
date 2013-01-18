@@ -34,9 +34,10 @@
  */
 
 require_once dirname(__DIR__) . '/ActiveGateway.class.php';
-require_once dirname(__DIR__) . '/ActiveGatewayRecord.class.php';
-require_once dirname(__DIR__) . '/ActiveGatewayRecords.class.php';
-require_once dirname(__DIR__) . '/ActiveGatewayCondition.class.php';
+require_once __DIR__ . '/Record.class.php';
+require_once __DIR__ . '/Records.class.php';
+require_once __DIR__ . '/Condition.class.php';
+require_once __DIR__ . '/PDO.class.php';
 require_once __DIR__ . '/Utils.class.php';
 require_once __DIR__ . '/Driver.abstract.php';
 require_once __DIR__ . '/Exception.class.php';
@@ -399,6 +400,7 @@ class ActiveGateway_Manager
         $helpers[$type] = $helper;
         return $helper;
     }
+
 
 
     /**

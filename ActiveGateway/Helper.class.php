@@ -73,23 +73,63 @@ class ActiveGateway_Helper
     
     
     /**
+     * column schema to SQL.
+     *
+     * @access  public
+     * @param   ActiveGateway_Schema_Column $column
+     * @param   array                       &$params
+     * @return  string
+     */
+    public function columnToSQL(ActiveGateway_Schema_Column $column, array &$params)
+    {
+        throw new ActiveGateway_Exception('implements method. -> columnToSQL');
+    }
+    
+    
+    /**
      * column type to SQL.
      *
      * @access  public
      * @param   string  $type
      * @param   mixed   $length
+     * param    array   &$params
      */
-    public function columnTypeToSQL($type, $length = NULL)
+    public function columnTypeToSQL($type, $length, &$params)
     {
         $sql = array();
         $sql[] = $this->convertColumnType($type);
         if ( $length !== NULL ) {
-            $sql[] = '(' . $length . ')';
+            if ( is_array($length) ) {
+                $values = array();
+                foreach ( $length as $value ) {
+                    $bind_key = $this->_generateBindKey('column_length', $type);
+                    $params[$bind_key] = $value;
+                    $values[] = $bind_key;
+                }
+                $bind_key = join(',', $values);
+            } else {
+                $bind_key = $this->_generateBindKey('column_length', $type);
+                $params[$bind_key] = $length;
+            }
+            $sql[] = '(' . $bind_key . ')';
         }
         $sql = join(' ', $sql);
         return $sql;
     }
 
+    
+    /**
+     * index to SQL.
+     *
+     * @access  public
+     * @param   ActiveGateway_Schema_Index  $index
+     * @param   array                       &$params
+     * @return  string
+     */
+    public function indexToSql(ActiveGateway_Schema_Index $index, array &$params)
+    {
+        throw new ActiveGateway_Exception('implements method. -> primaryIndexToSql');
+    }
 
     /**
      * unique index to SQL.
@@ -98,9 +138,21 @@ class ActiveGateway_Helper
      * @param   ActiveGateway_Schema_Unique $index
      * @return  string
      */
-    public function uniqueIndexToSql(ActiveGateway_Schema_Unique $index)
+    public function uniqueIndexToSql(ActiveGateway_Schema_Unique $index, array &$params)
     {
         throw new ActiveGateway_Exception('implements method. -> uniqueIndexToSql');
+    }
+
+    /**
+     * primary index to SQL.
+     *
+     * @access  public
+     * @param   ActiveGateway_Schema_Primary    $index
+     * @return  string
+     */
+    public function primaryIndexToSql(ActiveGateway_Schema_Primary $index)
+    {
+        throw new ActiveGateway_Exception('implements method. -> primaryIndexToSql');
     }
 
 
@@ -130,6 +182,62 @@ class ActiveGateway_Helper
     protected function _generateBindKey($base_key, $seed)
     {
         return sprintf(':%s%s', $base_key, md5($seed . uniqid()));
+    }
+
+
+
+    /**
+     * is update query ?
+     *
+     * @access  public
+     * @param   string  $sql
+     * @return  boolean
+     */
+    public function isUpdateQuery($sql)
+    {
+        $sql = trim($sql);
+        return preg_match('/^(INSERT|UPDATE|DELETE|BEGIN|COMMIT|CREATE|DROP|ALTER|GRANT|TRUNCATE)/i', $sql);
+    }
+
+
+
+
+
+    /**
+     * get migration files.
+     *
+     * @access  public
+     * @param   string  $path
+     * @param   int     $from
+     * @param   int     $to
+     */
+    public function getMigrationFiles($path, $from = NULL, $to = NULL)
+    {
+        if ( ! is_dir($path) ) throw new ActiveGateway_Exception('Invalid migration path. -> ' . $path);
+
+        $files = array();
+        $handle = opendir($path);
+        while ( false !== ( $entry = readdir($handle) ) ) {
+            if ( $entry === '.' || $entry === '..' ) continue;
+            if ( ! preg_match('/^([0-9]+)_\w+.php$/', $entry, $matches) ) continue;
+
+            // compare version.
+            $file_version = (int)$matches[1];
+            $file_path = $path . '/' . $entry;
+            $class_name = join('', array_map('ucfirst', explode('_', str_replace('.php', '', $entry))));
+            if ( $from === NULL && $to === NULL ) {
+                $files[$file_version] = array('path' => $file_path, 'class' => $class_name, 'version' => $file_version);
+            } elseif ( $from !== NULL && $to !== NULL && $from <= $file_version && $file_version <= $to ) {
+                $files[$file_version] = array('path' => $file_path, 'class' => $class_name, 'version' => $file_version);
+            } elseif ( $from !== NULL && $from <= $file_version ) {
+                $files[$file_version] = array('path' => $file_path, 'class' => $class_name, 'version' => $file_version);
+            } elseif ( $to !== NULL && $file_version <= $to ) {
+                $files[$file_version] = array('path' => $file_path, 'class' => $class_name, 'version' => $file_version);
+            }
+        }
+        ksort($files);
+
+        return $files;
     }
 }
 

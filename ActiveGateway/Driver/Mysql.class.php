@@ -34,7 +34,7 @@
  */
 
 /**
- * ActiveGatewayのMysql用ドライバー
+ * Driver class for MySQL.
  * 
  * @package     ActiveGateway
  * @subpackage  Driver
@@ -47,19 +47,19 @@ class ActiveGateway_Driver_Mysql extends ActiveGateway_Driver
     /**
      * @override
      */
-    protected function _connect(array $dsn_info)
+    protected function _connect($dsn)
     {
-        $scheme  = $dsn_info['scheme'];
-        $user    = $dsn_info['user'];
-        $pass    = $dsn_info['pass'];
-        $host    = $dsn_info['host'];
-        $db_name = substr($dsn_info['path'],1);
+        $dsn_info = parse_url($dsn);
+        $user = $dsn_info['user'];
+        $pass = $dsn_info['pass'];
+        $host = $dsn_info['host'];
+        $port = isset($dsn_info['port']) ? $dsn_info['port'] : 3306;
+        $db_name = substr($dsn_info['path'], 1);
         try {
-            $connection = new Dungeon_PDO("mysql:dbname={$db_name};host={$host}", $user, $pass);
+            $connection = new ActiveGateway_PDO("mysql:dbname={$db_name};host={$host};port={$port}", $user, $pass);
         } catch(PDOException $Exception){
-            require_once 'ActiveGateway/Exception/ConnectionFailed.class.php';
+            require_once 'Exception/ConnectionFailed.class.php';
             throw new ActiveGateway_Exception_ConnectionFailed('Connection failed...');
-            //trigger_error(sprintf('[ActiveGateway_Driver_Mysql]:Connection failed... -> [%s]', $Exception->getMessage()), E_USER_ERROR);
         }
         return $connection;
     }
@@ -183,7 +183,11 @@ class ActiveGateway_Driver_Mysql extends ActiveGateway_Driver
         
         //取得
         $sql = "DESCRIBE `{$table_name}`";
-        $stmt = $this->query($sql);
+        if ( $this->connection_slave ) {
+            $stmt = $this->query(ActiveGateway::TARGET_SLAVE, $sql);
+        } else {
+            $stmt = $this->query(ActiveGateway::TARGET_MASTER, $sql);
+        }
         $table_info = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         //整形

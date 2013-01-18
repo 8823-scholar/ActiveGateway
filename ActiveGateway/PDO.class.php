@@ -34,54 +34,55 @@
  */
 
 /**
- * unique schema class.
+ * PDO class for ActiveGateway.
  * 
  * @package     ActiveGateway
- * @subpackage  Schema
  * @copyright   Samurai Framework Project
  * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
-class ActiveGateway_Schema_Unique extends ActiveGateway_Schema_Index
+class ActiveGateway_PDO extends PDO
 {
     /**
-     * convert to SQL.
+     * in transaction ?
      *
-     * @access  public
-     * @param   array   &$params
+     * @access  private
+     * @var     boolean
      */
-    public function toSQL(array &$params)
-    {
-        $helper = $this->_schema->getHelper();
-        $sql = $helper->uniqueIndexToSql($this, $params);
-        return $sql;
-    }
+    private $_in_transaction = false;
 
 
-    /**
-     * convert to string.
-     *
-     * @access  public
-     * @return  string
-     */
-    public function toString()
-    {
-        $string = sprintf('create unique index: %s', $this->getName());
-        return $string;
-    }
-    
-    
-    
     /**
      * @override
      */
-    public function getName()
+    public function beginTransaction()
     {
-        if ( $this->name ) return $this->name;
+        if ( ! $this->_in_transaction ) {
+            $this->_in_transaction = parent::beginTransaction();
+        }
+        return $this->_in_transaction;
+    }
 
-        // auto generate.
-        $name = sprintf('unique_%s_on_%s', $this->getTableName(), join('_and_', $this->_columns));
-        return $name;
+    /**
+     * @override
+     */
+    public function commit()
+    {
+        if ( $this->_in_transaction ) {
+            parent::commit();
+            $this->_in_transaction = false;
+        }
+    }
+
+    /**
+     * @override
+     */
+    public function rollback()
+    {
+        if ( $this->_in_transaction ) {
+            parent::rollback();
+            $this->_in_transaction = false;
+        }
     }
 }
 

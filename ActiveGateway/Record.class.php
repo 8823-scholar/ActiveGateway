@@ -34,14 +34,14 @@
  */
 
 /**
- * ActiveGatewayで使用するレコードを表すクラス
+ * record instance.
  * 
  * @package     ActiveGateway
  * @copyright   Samurai Framework Project
  * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
-class ActiveGatewayRecord
+class ActiveGateway_Record
 {
     /**
      * オリジナルの値を保持
@@ -105,7 +105,7 @@ class ActiveGatewayRecord
         //$rowの展開
         if($row !== NULL){
             if(!is_array($row) && !is_object($row)){
-                trigger_error('[ActiveGatewayRecord]:$row is Not Array');
+                throw new ActiveGateway_Exception('Invalid row.');
             }
             foreach($row as $_key => $_val){
                 if($_key[0] != '_'){

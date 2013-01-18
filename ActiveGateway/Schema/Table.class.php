@@ -93,12 +93,43 @@ class ActiveGateway_Schema_Table
     private $_collate;
 
     /**
+     * comment
+     *
+     * @access  private
+     * @var     string
+     */
+    private $_comment;
+
+    /**
      * schema
      *
      * @access  private
      * @var     ActiveGateway_Schema
      */
     private $_schema;
+
+    /**
+     * mode.
+     * default is "create".
+     *
+     * @access  private
+     * @var     int
+     */
+    private $_mode = self::MODE_CREATE;
+
+    /**
+     * const: mode "create".
+     *
+     * @const   int
+     */
+    const MODE_CREATE = 1;
+
+    /**
+     * const: mode "drop".
+     *
+     * @const   int
+     */
+    const MODE_DROP = 2;
 
 
     /**
@@ -164,26 +195,10 @@ class ActiveGateway_Schema_Table
      */
     public function primary($column_name)
     {
-        $primary = new ActiveGateway_Schema_Primary($column_name);
+        $primary = new ActiveGateway_Schema_Primary($this->getName(), $column_name);
+        $primary->setSchema($this->getSchema());
         $this->_keys[] = $primary;
-        $primary->setTable($this);
         return $primary;
-    }
-
-
-    /**
-     * add unique key.
-     *
-     * @access  public
-     * @param   string  $column_name
-     * @return  ActiveGateway_Schema_Unique
-     */
-    public function unique($column_name)
-    {
-        $unique = new ActiveGateway_Schema_Unique($column_name);
-        $this->_keys[] = $unique;
-        $unique->setTable($this);
-        return $unique;
     }
 
 
@@ -244,6 +259,19 @@ class ActiveGateway_Schema_Table
     }
 
 
+    /**
+     * set mode "drop".
+     *
+     * @access  public
+     * @return  ActiveGateway_Schema_Table
+     */
+    public function drop()
+    {
+        $this->_mode = self::MODE_DROP;
+        return $this;
+    }
+
+
 
 
 
@@ -251,14 +279,30 @@ class ActiveGateway_Schema_Table
      * convert to SQL.
      *
      * @access  public
-     * @return  array   sql, params
+     * @param   array   &$params
+     * @return  string
      */
     public function toSQL(array &$params)
     {
-        $helper = $this->getHelper();
+        $helper = $this->_schema->getHelper();
         $sql = $helper->tableToSQL($this, $params);
         return $sql;
     }
+
+
+
+    /**
+     * convert to string.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function toString()
+    {
+        $string = sprintf('create table: %s', $this->getName());
+        return $string;
+    }
+
 
 
     /**
@@ -346,6 +390,19 @@ class ActiveGateway_Schema_Table
 
 
     /**
+     * is drop
+     *
+     * @access  public
+     * @return  boolean
+     */
+    public function isDrop()
+    {
+        return $this->_mode === self::MODE_DROP;
+    }
+
+
+
+    /**
      * get helper.
      *
      * @access  public
@@ -353,10 +410,7 @@ class ActiveGateway_Schema_Table
      */
     public function getHelper()
     {
-        $AGManager = ActiveGateway_Manager::singleton();
-        $AG = $AGManager->getActiveGateway($this->getSchema()->getAlias());
-        $helper = $AGManager->getHelper($AG);
-        return $helper;
+        return $this->getSchema()->getHelper();
     }
 }
 

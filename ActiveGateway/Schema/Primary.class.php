@@ -52,7 +52,7 @@ class ActiveGateway_Schema_Primary extends ActiveGateway_Schema_Unique
      */
     public function toSQL(array &$params)
     {
-        $helper = $this->_table->getHelper();
+        $helper = $this->_schema->getHelper();
         $sql = $helper->primaryIndexToSql($this, $params);
         return $sql;
     }

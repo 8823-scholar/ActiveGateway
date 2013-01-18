@@ -72,9 +72,17 @@ class ActiveGateway_Schema
     /**
      * const: column types 
      *
-     * @const
+     * @const   string
      */
     const COLUMN_TYPE_STRING = 'string';
+    const COLUMN_TYPE_LIST = 'list';
+
+    /**
+     * const: table name of migrations.
+     *
+     * @const   string
+     */
+    const TABLE_SCHEMA_MIGRATIONS = 'schema_migrations';
 
 
     /**
@@ -113,6 +121,17 @@ class ActiveGateway_Schema
         $this->_version = $version;
     }
 
+    /**
+     * get version
+     *
+     * @access  public
+     * @return  int
+     */
+    public function getVersion()
+    {
+        return $this->_version;
+    }
+
 
 
     /**
@@ -147,6 +166,78 @@ class ActiveGateway_Schema
         $table->column('id')->type('int', 11)->primary();
 
         return $table;
+    }
+
+    /**
+     * drop table.
+     * not apply into database immediately.
+     *
+     * @access  public
+     * @param   string  $name
+     * @return  ActiveGateway_Schema_Table
+     */
+    public function dropTable($name)
+    {
+        $table = new ActiveGateway_Schema_Table($name);
+        $table->setSchema($this);
+        $table->drop();
+        $this->_defines[] = $table;
+
+        return $table;
+    }
+
+
+    /**
+     * create index.
+     * not apply into database immediately.
+     *
+     * @access  public
+     * @param   string  $table
+     * @param   mixed   $column
+     * @return  ActiveGateway_Schema_Index
+     */
+    public function createIndex($table, $column)
+    {
+        $index = new ActiveGateway_Schema_Index($table, $column);
+        $index->setSchema($this);
+        $this->_defines[] = $index;
+
+        return $index;
+    }
+
+    /**
+     * create unique index.
+     * not apply into database immediately.
+     *
+     * @access  public
+     * @param   string  $table
+     * @param   mixed   $column
+     * @return  ActiveGateway_Schema_Unique
+     */
+    public function createUnique($table, $column)
+    {
+        $index = new ActiveGateway_Schema_Unique($table, $column);
+        $index->setSchema($this);
+        $this->_defines[] = $index;
+
+        return $index;
+    }
+
+
+
+
+    /**
+     * get helper.
+     *
+     * @access  public
+     * @return  ActiveGateway_Helper
+     */
+    public function getHelper()
+    {
+        $AGManager = ActiveGateway::getManager();
+        $AG = $AGManager->getActiveGateway($this->getAlias());
+        $helper = $AG->getHelper();
+        return $helper;
     }
 }
 

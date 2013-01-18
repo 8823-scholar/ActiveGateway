@@ -34,9 +34,7 @@
  */
 
 /**
- * ActiveGateway各種ドライバーの抽象クラス
- *
- * 各種ドライバーは必ず継承すること
+ * Driver to backend class.
  * 
  * @package     ActiveGateway
  * @subpackage  Driver
@@ -55,21 +53,12 @@ abstract class ActiveGateway_Driver
     protected $connection;
 
     /**
-     * connection of master.
+     * connection of slave.
      *
      * @access   protected
      * @var      resource
      */
-    protected $connection_master;
-
-    /**
-     * DSN
-     *
-     * @access  protected
-     * @var     string
-     */
-    protected $dsn;
-    protected $dsn_master;
+    protected $connection_slave;
 
     /**
      * in transcation flag.
@@ -87,7 +76,6 @@ abstract class ActiveGateway_Driver
      */
     public function __construct()
     {
-        
     }
 
 
@@ -95,7 +83,7 @@ abstract class ActiveGateway_Driver
 
 
     /**
-     * 接続
+     * connect.
      *
      * @access  public
      * @param   string  $target
@@ -103,34 +91,22 @@ abstract class ActiveGateway_Driver
      */
     public function connect($target, $dsn)
     {
-        $AGM = ActiveGatewayManager::singleton();
-        if($target == 'slave'){
-            $this->dsn = $dsn;
-            if($AGM->hasConnection($dsn)){
-                $this->connection = $AGM->getConnection($dsn);
-            } else {
-                $this->connection = $this->_connect(parse_url($dsn));
-                $AGM->setConnection($dsn, $this->connection);
-            }
-        } else {
-            $this->dsn_master = $dsn;
-            if($AGM->hasConnection($dsn)){
-                $this->connection_master = $AGM->getConnection($dsn);
-            } else {
-                $this->connection_master = $this->_connect(parse_url($dsn));
-                $AGM->setConnection($dsn, $this->connection_master);
-            }
+        $AGM = ActiveGateway_Manager::singleton();
+        if ( $target === ActiveGateway::TARGET_MASTER && ! $this->hasConnection($target) ) {
+            $this->connection = $this->_connect($dsn);
+        } elseif( $target === ActiveGateway::TARGET_SLAVE && ! $this->hasConnection($target) ) {
+            $this->connection_slave = $this->_connect($dsn);
         }
     }
 
 
     /**
-     * 各種ドライバー用コネクト
+     * abstract: connect to backend by driver.
      *
-     * @param      array    $dsn_info   分解されたDSN情報
-     * @return     resource コネクション
+     * @param   string  $dsn
+     * @return  resource
      */
-    abstract protected function _connect(array $dsn_info);
+    abstract protected function _connect($dsn);
 
 
     /**
@@ -142,152 +118,118 @@ abstract class ActiveGateway_Driver
     {
         $this->connection = NULL;
         $this->connection_master = NULL;
-        $AGM = ActiveGateway_Manager::singleton();
-        $AGM->delConnection($this->dsn);
-        $AGM->delConnection($this->dsn_master);
     }
 
 
     /**
-     * コネクションが確立されているのかどうか
+     * has connection.
      *
      * @access  public
      * @param   string  $target
      * @return  boolean
      */
-    public function hasConnection($target = 'master')
+    public function hasConnection($target)
     {
-        if($target == 'master'){
-            return $this->connection_master !== NULL;
-        } else {
+        if ( $target === ActiveGateway::TARGET_MASTER ) {
             return $this->connection !== NULL;
+        } else {
+            return $this->connection_slave !== NULL;
         }
     }
 
 
 
     /**
-     * クエリー
+     * query.
      *
-     * @access     public
-     * @param      string  $sql      SQL文
-     * @param      array   $params   ブレースフォルダ
-     * @return     object  PDOステートメント
+     * @access  public
+     * @param   staring $target
+     * @param   string  $sql
+     * @param   array   $params
      */
-    public function query($sql, $params = array(), $for_update = false)
+    public function query($target, $sql, $params = array())
     {
-        if($for_update) $sql = $this->modifyForUpdateQuery($sql);
-        if($this->_marker){
-            $sql .= ' #' . $this->_marker;
-            $this->_marker = '';
-        }
-        //ステートメントの生成
-        if($this->_isUpdateQuery($sql) || $this->_in_transaction){
-            $stmt = $this->connection_master->prepare($sql);
-        } else {
+        if ( $target === ActiveGateway::TARGET_MASTER ) {
             $stmt = $this->connection->prepare($sql);
+        } else {
+            $stmt = $this->connection_slave->prepare($sql);
         }
-        //ブレースフォルダの割当て
+
+        // placeholder
         foreach($params as $_key => $_val){
-            //データタイプのディフォルトは文字列
             $param_type = PDO::PARAM_STR;
-            if(is_null($_val)){
+            if ( is_null($_val) ) {
                 $param_type = PDO::PARAM_NULL;
-            } elseif(is_int($_val)){
+            } elseif ( is_int($_val) ) {
                 $param_type = PDO::PARAM_INT;
-            } elseif(is_bool($_val)){
+            } elseif ( is_bool($_val) ) {
                 $param_type = PDO::PARAM_BOOL;
-            } elseif(is_resource($_val)){
+            } elseif ( is_resource($_val) ) {
                 $param_type = PDO::PARAM_LOB;
-            } elseif(strlen($_val)>=5120){
+            } elseif ( strlen($_val) >= 5120 ) {
                 $param_type = PDO::PARAM_LOB;
             }
             $stmt->bindValue($_key, $_val, $param_type);
         }
-        //実行
+
+        // execute.
         $execute_start = microtime(true);
         $stmt->execute();
-        $execute_end   = microtime(true);
-        ActiveGatewayManager::singleton()->poolQuery($stmt->queryString, $execute_end-$execute_start);
-        //エラーチェック
-        $this->_checkError($stmt, $params);
+        $this->_checkError($stmt);
+        $execute_end = microtime(true);
+        ActiveGateway_Manager::singleton()->poolQuery($stmt->queryString, $execute_end - $execute_start);
         return $stmt;
     }
 
 
-    /**
-     * リミットクエリー
-     *
-     * SQL文中にリミットを記述してもかまわないが、リミットに関しては、各DBで文法が違うため、
-     * その差異を吸収するメソッドとして、このメソッドは存在する。
-     * ディフォルトでうまくうごかないDBは、それぞれのドライバーに専用のメソッドを記述してオーバーライドすること。
-     *
-     * @access     public
-     * @param      string  $sql      SQL文
-     * @param      array   $params   ブレースフォルダ
-     * @param      int     $offset   開始位置
-     * @param      int     $limit    取得数
-     * @return     object  PDOステートメント
-     */
-    public function limitQuery($sql, $params = array(), $offset = NULL, $limit = NULL, $for_update = false)
-    {
-        if($this->_isUpdateQuery($sql)){
-            $sql = $this->modifyUpdateLimitQuery($sql, $limit);
-        } else {
-            $sql = $this->modifyLimitQuery($sql, $offset, $limit);
-        }
-        if($for_update) $sql = $this->modifyForUpdateQuery($sql);
-        return $this->query($sql, $params);
-    }
-
-
 
     /**
-     * トランザクション開始
+     * start transaction
      *
-     * @access     public
+     * @access  public
      */
     public function tx()
     {
-        if(!$this->_in_transaction){
+        if ( ! $this->_in_transaction ) {
             $this->_in_transaction = true;
-            $this->connection_master->beginTransaction();
+            $this->connection->beginTransaction();
         }
     }
 
 
     /**
-     * ロールバック
+     * rollback.
      *
-     * @access     public
+     * @access  public
      */
     public function rollback()
     {
-        if($this->_in_transaction){
+        if ( $this->_in_transaction ) {
             $this->_in_transaction = false;
-            $this->connection_master->rollback();
+            $this->connection->rollback();
         }
     }
 
 
     /**
-     * コミット
+     * commit
      *
-     * @access     public
+     * @access  public
      */
     public function commit()
     {
-        if($this->_in_transaction){
+        if ( $this->_in_transaction ) {
             $this->_in_transaction = false;
-            $this->connection_master->commit();
+            $this->connection->commit();
         }
     }
 
 
     /**
-     * トランザクション内かどうか
+     * in transaction ?
      *
-     * @access     public
+     * @access  public
+     * @return  boolean
      */
     public function inTx()
     {
@@ -296,14 +238,14 @@ abstract class ActiveGateway_Driver
 
 
     /**
-     * lastInsertID
+     * get lastInsertID
      *
      * @access     public
      * @return     int
      */
     public function lastInsertId()
     {
-        return $this->connection_master->lastInsertId();
+        return $this->connection->lastInsertId();
     }
 
 
@@ -419,43 +361,15 @@ abstract class ActiveGateway_Driver
 
 
     /**
-     * マーカーセット
+     * check error.
      *
-     * @access  public
-     * @param   string  $marker
+     * @access  private
      */
-    public function setMarker($marker)
-    {
-        $this->_marker = $marker;
-    }
-
-
-
-    /**
-     * 更新文かどうかの判断
-     *
-     * @access     protected
-     * @param      string  $sql   SQL文
-     * @return     boolean
-     */
-    protected function _isUpdateQuery($sql)
-    {
-        $sql = trim($sql);
-        return stripos($sql, 'UPDATE') === 0 || stripos($sql, 'INSERT') === 0 || stripos($sql, 'DELETE') === 0
-            || stripos($sql, 'BEGIN') === 0 || stripos($sql, 'COMMIT') === 0 || stripos($sql, 'COMMIT') === 0;
-    }
-
-
-    /**
-     * クエリー実行後のエラーチェック
-     *
-     * @access     private
-     */
-    protected function _checkError($stmt, $params)
+    protected function _checkError($stmt)
     {
         @list($code, $driver_code, $message) = $stmt->errorInfo();
         if($code != '00000'){
-            throw(new Exception("ActiveGateway(PDO) Error[{$code}][{$driver_code}]: {$message} -> " . $stmt->queryString));
+            throw new ActiveGateway_Exception("Error[{$code}][{$driver_code}]: {$message} -> " . $stmt->queryString);
         }
     }
 }

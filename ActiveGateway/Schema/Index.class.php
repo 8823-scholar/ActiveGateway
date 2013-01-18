@@ -61,35 +61,83 @@ class ActiveGateway_Schema_Index
     protected $_columns = array();
 
     /**
-     * container table.
+     * container table name.
      *
      * @access  protected
-     * @var     ActiveGateway_Schema_Table
+     * @var     string
      */
-    protected $_table;
+    protected $_table_name;
+
+    /**
+     * schema.
+     *
+     * @access  protected
+     * @var     ActiveGateway_Schema
+     */
+    protected $_schema;
 
 
     /**
      * constructor.
      *
      * @access  public
-     * @param   string  $column_name
+     * @param   string  $table
+     * @param   string  $column
      */
-    public function __construct($column_name)
+    public function __construct($table, $column)
     {
-        $this->append($column_name);
+        $this->setTableName($table);
+        if ( is_array($column) ) {
+            foreach ( $column as $c ) $this->append($c);
+        } else {
+            $this->append($column);
+        }
     }
 
 
     /**
-     * set table.
+     * set schema.
      *
      * @access  public
-     * @param   ActiveGateway_Schema_Table
+     * @param   ActiveGateway_Schema    $schema
      */
-    public function setTable(ActiveGateway_Schema_Table $table)
+    public function setSchema(ActiveGateway_Schema $schema)
     {
-        $this->_table = $table;
+        $this->_schema = $schema;
+    }
+
+    /**
+     * get schema.
+     *
+     * @access  public
+     * @return  ActiveGateway_Schema
+     */
+    public function getSchema()
+    {
+        return $this->_schema;
+    }
+
+
+    /**
+     * get table name.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function getTableName()
+    {
+        return $this->_table_name;
+    }
+
+    /**
+     * set table name.
+     *
+     * @access  public
+     * @param   string  $table
+     */
+    public function setTableName($table)
+    {
+        $this->_table_name = $table;
     }
 
 
@@ -104,8 +152,50 @@ class ActiveGateway_Schema_Index
         if ( $this->name ) return $this->name;
 
         // auto generate.
-        $name = sprintf('index_%s_on_%s', $this->_table->getName(), join('_and_', $this->_columns));
+        $name = sprintf('index_%s_on_%s', $this->getTableName(), join('_and_', $this->_columns));
         return $name;
+    }
+
+    /**
+     * set name.
+     *
+     * @access  public
+     * @param   string  $name
+     * @return  ActiveGateway_Schema_Index
+     */
+    public function setName($name)
+    {
+        $this->name = $name;
+        return $this;
+    }
+    
+    
+    
+    
+    /**
+     * convert to SQL.
+     *
+     * @access  public
+     * @param   array   &$params
+     */
+    public function toSQL(array &$params)
+    {
+        $helper = $this->_schema->getHelper();
+        $sql = $helper->indexToSql($this, $params);
+        return $sql;
+    }
+
+
+    /**
+     * convert to string.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function toString()
+    {
+        $string = sprintf('create index: %s', $this->getName());
+        return $string;
     }
 
 
@@ -120,24 +210,12 @@ class ActiveGateway_Schema_Index
      */
     public function append($column_name)
     {
+        if ( ! is_string($column_name) ) throw new ActiveGateway_Exception('Invalid column name.');
         if ( ! in_array($column_name, $this->_columns) ) {
             $this->_columns[] = $column_name;
         }
+        return $this;
     }
-
-
-    /**
-     * index defined end sign.
-     *
-     * @access  public
-     * @return  ActiveGateway_Schema_Table
-     */
-    public function end()
-    {
-        return $this->_table;
-    }
-
-
 
 
     /**
@@ -149,22 +227,6 @@ class ActiveGateway_Schema_Index
     public function getColumns()
     {
         return $this->_columns;
-    }
-    
-    
-    
-    
-    
-    /**
-     * called undefined method.
-     *
-     * @access  public
-     * @param   string  $method
-     * @param   array   $args
-     */
-    public function __call($method, array $args = array())
-    {
-        return call_user_func_array(array($this->_table, $method), $args);
     }
 }
 

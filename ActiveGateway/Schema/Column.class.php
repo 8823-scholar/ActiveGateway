@@ -69,6 +69,14 @@ class ActiveGateway_Schema_Column
     private $_type_length = NULL;
 
     /**
+     * default value
+     *
+     * @access  private
+     * @var     mixed
+     */
+    private $_default = NULL;
+
+    /**
      * collation
      *
      * @access  private
@@ -82,7 +90,7 @@ class ActiveGateway_Schema_Column
      * @access  private
      * @var     boolean
      */
-    private $_enable_null = true;
+    private $_enable_null = false;
 
     /**
      * auto increment.
@@ -164,6 +172,20 @@ class ActiveGateway_Schema_Column
 
 
     /**
+     * set default value.
+     *
+     * @access  public
+     * @param   mixed   $default
+     * @return  ActiveGateway_Schema_Column
+     */
+    public function defaultValue($default)
+    {
+        $this->_default = $default;
+        return $this;
+    }
+
+
+    /**
      * set collation
      *
      * @access  public
@@ -186,6 +208,18 @@ class ActiveGateway_Schema_Column
     public function notNull()
     {
         $this->_enable_null = false;
+        return $this;
+    }
+
+    /**
+     * enable null
+     *
+     * @access  public
+     * @return  ActiveGateway_Schema_Column
+     */
+    public function enableNull()
+    {
+        $this->_enable_null = true;
         return $this;
     }
 
@@ -282,6 +316,18 @@ class ActiveGateway_Schema_Column
     {
         return $this->_type_length;
     }
+
+
+    /**
+     * get default value.
+     *
+     * @access  public
+     * @return  mixed
+     */
+    public function getDefaultValue()
+    {
+        return $this->_default;
+    }
     
     
     /**
@@ -302,7 +348,7 @@ class ActiveGateway_Schema_Column
      * @access  public
      * @return  boolean
      */
-    public function enableNull()
+    public function isEnableNull()
     {
         return $this->_enable_null;
     }

@@ -64,33 +64,40 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
     public function tableToSQL(ActiveGateway_Schema_Table $table, array &$params)
     {
         $sql = array();
-        $sql[] = sprintf("CREATE TABLE IF NOT EXISTS %s (", $this->escapeColumn($table->getName()));
 
-        $sql_parts = array();
-        foreach ( $table->getColumns() as $column ) {
-            $sql_parts[] = '    ' . $column->toSQL($params);
-        }
-        foreach ( $table->getKeys() as $key ) {
-            $sql_parts[] = '    ' . $key->toSQL($params);
-        }
-        $sql[] = join(",\n", $sql_parts);
+        // if drop.
+        if ( $table->isDrop() ) {
+            $sql[] = sprintf("DROP TABLE IF EXISTS %s;", $this->escapeColumn($table->getName()));
 
-        $options = array();
-        if ( $engine = $table->getEngine() ) {
-            $options[] = 'ENGINE = ' . $engine;
+        } else {
+            $sql[] = sprintf("CREATE TABLE IF NOT EXISTS %s (", $this->escapeColumn($table->getName()));
+
+            $sql_parts = array();
+            foreach ( $table->getColumns() as $column ) {
+                $sql_parts[] = '    ' . $column->toSQL($params);
+            }
+            foreach ( $table->getKeys() as $key ) {
+                $sql_parts[] = '    ' . $key->toSQL($params);
+            }
+            $sql[] = join(",\n", $sql_parts);
+
+            $options = array();
+            if ( $engine = $table->getEngine() ) {
+                $options[] = 'ENGINE = ' . $engine;
+            }
+            if ( $charset = $table->getCharset() ) {
+                $options[] = 'DEFAULT CHARSET = ' . $charset;
+            }
+            if ( $collate = $table->getCollate() ) {
+                $options[] = 'COLLATE = ' . $collate;
+            }
+            if ( $comment = $table->getComment() ) {
+                $bind_key = $this->_generateBindKey('table_comment', $table->getName());
+                $options[] = 'COMMENT = ' . $bind_key;
+                $params[$bind_key] = $comment;
+            }
+            $sql[] = ') ' . join(' ', $options) . ';';
         }
-        if ( $charset = $table->getCharset() ) {
-            $options[] = 'DEFAULT CHARSET = ' . $charset;
-        }
-        if ( $collate = $table->getCollate() ) {
-            $options[] = 'COLLATE = ' . $collate;
-        }
-        if ( $comment = $table->getComment() ) {
-            $bind_key = $this->_generateBindKey('table_comment', $table->getName());
-            $options[] = 'COMMENT = ' . $bind_key;
-            $params[$bind_key] = $comment;
-        }
-        $sql[] = ') ' . join(' ', $options) . ';';
 
         return join("\n", $sql);
     }
@@ -102,17 +109,23 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
     {
         $values = array();
         $values[] = $this->escapeColumn($column->getName());
-        $values[] = $this->columnTypeToSQL($column->getType(), $column->getTypeLength());
-        if ( $collate = $column->getCollate() ) {
-            $values[] = 'COLLATE ' . $collate;
-        }
-        if ( $column->enableNull() ) {
-            $values[] = 'NULL';
-        } else {
+        $values[] = $this->columnTypeToSQL($column->getType(), $column->getTypeLength(), $params);
+        if ( ! $column->isEnableNull() ) {
             $values[] = 'NOT NULL';
+        }
+        $default = $column->getDefaultValue();
+        if ( $default === NULL && $column->isEnableNull() ) {
+            $values[] = 'DEFAULT NULL';
+        } elseif ( $default !== NULL ) {
+            $bind_key = $this->_generateBindKey('column_default', $column->getName());
+            $values[] = 'DEFAULT ' . $bind_key;
+            $params[$bind_key] = $default;
         }
         if ( $column->isAutoIncrement() ) {
             $values[] = 'AUTO_INCREMENT';
+        }
+        if ( $collate = $column->getCollate() ) {
+            $values[] = 'COLLATE ' . $collate;
         }
 
         if ( $comment = $column->getComment() ) {
@@ -128,27 +141,44 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
     /**
      * @implements
      */
-    public function primaryIndexToSql(ActiveGateway_Schema_primary $index)
+    public function indexToSql(ActiveGateway_Schema_Index $index, array &$params)
     {
-        $values = array();
-        $values[] = 'PRIMARY KEY';
+        $sql = array();
+        $sql[] = sprintf('ALTER TABLE %s', $this->escapeColumn($index->getTableName()));
+        $sql[] = sprintf('ADD INDEX %s', $index->getName());
         $columns = array();
         foreach ( $index->getColumns() as $column ) {
             $columns[] = $this->escapeColumn($column);
         }
-        $values[] = sprintf('(%s)', join(', ', $columns));
-        $sql = join(' ', $values);
+        $sql[] = sprintf('(%s)', join(', ', $columns));
+        $sql = join(' ', $sql) . ';';
         return $sql;
     }
 
     /**
      * @implements
      */
-    public function uniqueIndexToSql(ActiveGateway_Schema_Unique $index)
+    public function uniqueIndexToSql(ActiveGateway_Schema_Unique $index, array &$params)
+    {
+        $sql = array();
+        $sql[] = sprintf('ALTER TABLE %s', $this->escapeColumn($index->getTableName()));
+        $sql[] = sprintf('ADD UNIQUE %s', $index->getName());
+        $columns = array();
+        foreach ( $index->getColumns() as $column ) {
+            $columns[] = $this->escapeColumn($column);
+        }
+        $sql[] = sprintf('(%s)', join(', ', $columns));
+        $sql = join(' ', $sql) . ';';
+        return $sql;
+    }
+
+    /**
+     * @implements
+     */
+    public function primaryIndexToSql(ActiveGateway_Schema_Primary $index)
     {
         $values = array();
-        $values[] = 'UNIQUE KEY';
-        $values[] = $this->escapeColumn($index->getName());
+        $values[] = 'PRIMARY KEY';
         $columns = array();
         foreach ( $index->getColumns() as $column ) {
             $columns[] = $this->escapeColumn($column);
@@ -172,6 +202,9 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
         switch ( $type ) {
         case ActiveGateway_Schema::COLUMN_TYPE_STRING:
             $converted = 'VARCHAR';
+            break;
+        case ActiveGateway_Schema::COLUMN_TYPE_LIST:
+            $converted = 'ENUM';
             break;
         }
 

@@ -109,32 +109,22 @@ class ActiveGateway
     private $Driver;
 
     /**
-     * FETCH_MODE定数(LAZY)
+     * const: fetch mode.
      *
-     * @const    int
+     * @const   int
      */
     const FETCH_LAZY = PDO::FETCH_LAZY;
-
-    /**
-     * FETCH_MODE定数(ASSOC)
-     *
-     * @const    int
-     */
     const FETCH_ASSOC = PDO::FETCH_ASSOC;
-
-    /**
-     * FETCH_MODE定数(OBJ)
-     *
-     * @const    int
-     */
     const FETCH_OBJ = PDO::FETCH_OBJ;
+    const FETCH_BOTH = PDO::FETCH_BOTH;
 
     /**
-     * FETCH_MODE定数(BOTH)
+     * const: master or slqve
      *
-     * @const    int
+     * @const   string
      */
-    const FETCH_BOTH = PDO::FETCH_BOTH;
+    const TARGET_MASTER = 'master';
+    const TARGET_SLAVE = 'slave';
 
 
 
@@ -172,25 +162,27 @@ class ActiveGateway
 
 
     /**
-     * コネクト
+     * connect to backend.
      *
      * @access  public
      * @param   string  $target
      * @return  boolean 接続の可否
      */
-    public function connect($target = 'master')
+    public function connect($target = ActiveGateway::TARGET_MASTER)
     {
-        //接続済み
-        if($this->hasConnection($target)){
+        // already connected.
+        if ( $this->hasConnection($target) ) {
             return true;
         }
-        //DSNなし
-        if(!$this->hasDsn()){
-            trigger_error('[ActiveGateway]:DSN is Not Found.', E_USER_ERROR);
+
+        // not has define.
+        if ( ! $this->hasDsn() ) {
+            throw new ActiveGateway_Exception('Not has dsn.');
         }
-        //新規接続
-        if($target == 'master'){
-            $this->Driver->connect($target, $this->_dsn_master);
+
+        // connect.
+        if ( $target == ActiveGateway::TARGET_MASTER ) {
+            $this->Driver->connect($target, $this->_dsn);
         } else {
             $this->Driver->connect($target, $this->_dsn_slave);
         }
@@ -199,7 +191,7 @@ class ActiveGateway
 
 
     /**
-     * 切断
+     * disconnect from backend.
      *
      * @access     public
      */
@@ -385,12 +377,12 @@ class ActiveGateway
 
 
     /**
-     * レコードの挿入を行う
+     * insert a record.
      *
-     * @access     public
-     * @param      string  $alias        テーブル名
-     * @param      array   $attributes   各種値
-     * @return     object  ActiveGatewayRecord
+     * @access  public
+     * @param   string  $alias
+     * @param   array   $attributes
+     * @return  ActiveGateway_Record
      */
     public function insert($alias, $attributes = array())
     {
@@ -410,8 +402,9 @@ class ActiveGateway
         //ディフォルト値調節
         $this->Driver->modifyAttributes($table_info, $attributes);
         //インサート
+        $params = array();
         $sql = $this->Driver->modifyInsertQuery($table_name, $attributes, $params);
-        $stmt = $this->executeUpdate($sql, $params);
+        $stmt = $this->query($sql, $params);
         $attributes[$Record->getPrimaryKey()] = $this->Driver->lastInsertId();
         $record = $this->_buildRecord($alias, $attributes, false);
         return $record;
@@ -676,12 +669,12 @@ class ActiveGateway
 
 
     /**
-     * 新しいレコードインスタンスの生成
+     * build a active gateway record instance.
      *
-     * @access     public
-     * @param      string  $alias        テーブル名
-     * @param      array   $attributes   初期パラメータ
-     * @return     object  ActiveGatewayRecord
+     * @access  public
+     * @param   string  $alias
+     * @param   array   $attributes
+     * @return  ActiveGateway_Record
      */
     public function build($alias, $attributes = array())
     {
@@ -701,7 +694,7 @@ class ActiveGateway
      */
     private function _buildRecord($alias, $row = NULL, $new_record = true)
     {
-        $record = new ActiveGatewayRecord($row, $new_record, $alias);
+        $record = new ActiveGateway_Record($row, $new_record, $alias);
         //設定情報の取得
         $config = array();
         if($alias !== NULL && isset($this->_config[$alias])){
@@ -777,29 +770,27 @@ class ActiveGateway
 
 
     /**
-     * インスタンスを使ってデータを更新する
+     * save active gateway record.
      *
-     * @access     public
-     * @param      object  $record   ActiveGatewayRecord
-     * @return     boolean
+     * @access  public
+     * @param   ActiveGateway_Record    $record
      */
-    public function save(ActiveGatewayRecord &$record)
+    public function save(ActiveGateway_Record $record)
     {
-        //チェック
-        if(!$record->isSavable()){
-            trigger_error('[ActiveGateway]:This record can not save.', E_USER_ERROR);
+        if ( ! $record->isSavable() ) {
+            throw new ActiveGateway_Exception('This record is can not save.');
         }
-        //新規レコードの場合
-        if($record->isNewRecord()){
+
+        // new record.
+        if ( $record->isNewRecord() ) {
             $record = $this->insert($record->getAlias(), $record->getAttributes());
-            return true;
-        //既存レコードの場合
+
+        // exists record.
         } else {
-            if($attributes = $record->getAttributes(true)){
+            if ( $attributes = $record->getAttributes(true) ) {
                 $this->update($record->getAlias(), $record->getOriginalValue('primary_key'), $attributes);
                 $record->onSaved();
             }
-            return true;
         }
     }
 
@@ -807,14 +798,14 @@ class ActiveGateway
     /**
      * 上記のbuildとsaveの一連の流れを一つのメソッドで完結させてしまう場合はコレ
      *
-     * @access     public
-     * @param      string  $alias        テーブル名
-     * @param      array   $attributes   初期パラメータ
-     * @return     object  ActiveGatewayRecord
+     * @access  public
+     * @param   string  $alias
+     * @param   array   $attributes
+     * @return  ActiveGateway_Record
      */
     public function create($alias, $attributes = array())
     {
-        if(is_object($attributes) && $attributes instanceof ActiveGatewayRecord){
+        if ( is_object($attributes) && $attributes instanceof ActiveGateway_Record ) {
             $attributes->{$attributes->getPrimaryKey()} = NULL;
             $attributes = $attributes->toArray();
         }
@@ -845,45 +836,19 @@ class ActiveGateway
 
 
     /**
-     * 検索(SELECT)SQL文の実行
+     * execute query.
      *
-     * @access     public
-     * @param      string  $sql      SQL文
-     * @param      array   $params   ブレースホルダ
-     * @param      int     $limit    取得数
-     * @param      int     $offset   開始位置
-     * @return     object  PDOステートメント
+     * @access  public
+     * @param   string  $sql
+     * @param   array   $params 
      */
-    public function executeQuery($sql, $params = array(), $limit = NULL, $offset = NULL, $for_update = false)
+    public function query($sql, array $params = array())
     {
-        $this->connect('slave');
-        if($limit !== NULL || $offset !== NULL){
-            $stmt = $this->Driver->limitQuery($sql, $params, $offset, $limit, $for_update);
-        } else {
-            $stmt = $this->Driver->query($sql, $params, $for_update);
-        }
-        
-        return $stmt;
-    }
-
-
-    /**
-     * 更新(INSERT|UPDATE|DELETE)SQL文の実行
-     *
-     * @access     public
-     * @param      string  $sql      SQL文
-     * @param      array   $params   ブレースフォルダ
-     * @param      int     $limit    作用制限
-     * @return     object  PDOステートメント
-     */
-    public function executeUpdate($sql, $params = array(), $limit = NULL)
-    {
-        $this->connect('master');
-        if($limit !== NULL){
-            $stmt = $this->Driver->limitQuery($sql, $params, NULL, $limit); 
-        } else {
-            $stmt = $this->Driver->query($sql, $params);
-        }
+        $helper = $this->getHelper();
+        $target = $this->inTx() || $helper->isUpdateQuery($sql)
+                        ? ActiveGateway::TARGET_MASTER : ActiveGateway::TARGET_SLAVE;
+        $this->connect($target);
+        $stmt = $this->Driver->query($target, $sql, $params);
         return $stmt;
     }
 
@@ -892,14 +857,14 @@ class ActiveGateway
 
 
     /**
-     * トランザクション開始
+     * start transaction.
      *
-     * @access     public
-     * @param      string  $name   トランザクション名
+     * @access  public
+     * @param   string  $name
      */
     public function tx($name = NULL)
     {
-        $this->connect('master');
+        $this->connect(ActiveGateway::TARGET_MASTER);
         $this->Driver->tx($name);
     }
 
@@ -1000,7 +965,7 @@ class ActiveGateway
      */
     public function getOne($sql, $params = array(), $column = NULL)
     {
-        $stmt = $this->executeQuery($sql, $params, 1);
+        $stmt = $this->executeQuery($sql, $params);
         $row = $stmt->fetch(ActiveGateway::FETCH_BOTH);
         if($column !== NULL){
             if(isset($row[$column])){
@@ -1057,7 +1022,7 @@ class ActiveGateway
 
 
     /**
-     * コネクションを保持しているかどうか
+     * has connection ?
      *
      * @access  public
      * @param   string  $taregt
@@ -1070,19 +1035,19 @@ class ActiveGateway
 
 
     /**
-     * DSNを保持しているかどうか
+     * has dsn info ?
      *
      * @access     public
      * @return     boolean
      */
     public function hasDsn()
     {
-        return $this->_dsn_slave && $this->_dsn_master;
+        return $this->_dsn;
     }
     
     
     /**
-     * トランザクション内かどうか
+     * in transaction ?
      *
      * @access     public
      * @return     boolean
@@ -1319,6 +1284,31 @@ class ActiveGateway
 
 
 
+
+
+    /**
+     * get manager.
+     *
+     * @access  public
+     * @return  ActiveGateway_Manager
+     */
+    public static function getManager()
+    {
+        return ActiveGateway_Manager::singleton();
+    }
+
+
+    /**
+     * get helper.
+     *
+     * @access  public
+     * @return  ActiveGateway_Helper
+     */
+    public function getHelper()
+    {
+        $manager = self::getManager();
+        return $manager->getHelper($this);
+    }
 
 
     /**
