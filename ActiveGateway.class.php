@@ -245,10 +245,10 @@ class ActiveGateway
      *
      * @access     public
      * @param      string  $alias       テーブル名
-     * @param      array   $condition   ActiveGatewayCondition
+     * @param      array   $condition   ActiveGateway_Condition
      * @return     object  ActiveGatewayRecord
      */
-    public function findDetail($alias, ActiveGatewayCondition $condition)
+    public function findDetail($alias, ActiveGateway_Condition $condition)
     {
         $condition->total_rows = false;
         $condition->setLimit(1);
@@ -274,19 +274,18 @@ class ActiveGateway
 
 
     /**
-     * findAllシリーズ
-     * 内実、findAllDetailのシノニム。
+     * findAll.
+     * synonym of findAllDetail.
      *
-     * @access     public
-     * @param      string  $alias        テーブル名
-     * @param      object  $condition    ActiveGatewayCondition
-     * @return     object  ActiveGatewayRecords
+     * @access  public
+     * @param   string  $alias
+     * @param   ActiveGateway_Condition $cond
+     * @return  ActiveGateway_Records
      */
-    public function findAll($alias, ActiveGatewayCondition $condition = NULL)
+    public function findAll($alias, ActiveGateway_Condition $cond = NULL)
     {
-        if(!$condition) $condition = ActiveGateway::getCondition();
-        $condition->total_rows = false;
-        return $this->findAllDetail($alias, $condition);
+        if ( ! $cond ) $cond = ActiveGateway::getCondition();
+        return $this->findAllDetail($alias, $cond);
     }
 
 
@@ -297,8 +296,8 @@ class ActiveGateway
      * @param      string  $alias        テーブル名
      * @param      string  $column       カラム名
      * @param      mixed   $value        検索条件(配列可)
-     * @param      object  $condition    ActiveGatewayCondition
-     * @return     object  ActiveGatewayRecords
+     * @param      object  $condition    ActiveGateway_Condition
+     * @return     object  ActiveGateway_Records
      */
     public function findAllBy($alias, $column, $value, $condition = NULL)
     {
@@ -313,10 +312,10 @@ class ActiveGateway
      *
      * @access     public
      * @param      string  $alias       テーブル名
-     * @param      object  $condition   ActiveGatewayCondition
-     * @return     object  ActiveGatewayRecords
+     * @param      object  $condition   ActiveGateway_Condition
+     * @return     object  ActiveGateway_Records
      */
-    public function findAllDetail($alias, ActiveGatewayCondition $condition)
+    public function findAllDetail($alias, ActiveGateway_Condition $condition)
     {
         //初期化
         $Record = $this->_buildRecord($alias);
@@ -331,9 +330,7 @@ class ActiveGateway
         $sql = $this->makeSelectQuery($condition);
         
         //SQLから検索
-        $this->Driver->setMarker($condition->marker);
-        $result = $this->findAllSql($alias, $sql, $condition->getParams(), $condition->getLimit(), $condition->offset,
-                                        $condition->total_rows, $condition->for_update);
+        $result = $this->findAllSql($alias, $sql, $condition->getParams());
         $condition->clearParams();
 
         return $result;
@@ -341,35 +338,31 @@ class ActiveGateway
 
 
     /**
-     * findAllシリーズ、SQL検索
+     * find all use SQL.
      *
-     * @access     public
-     * @param      string  $alias        テーブル名
-     * @param      string  $sql          SQL文
-     * @param      array   $params       ブレースフォルダ
-     * @param      int     $limit        取得数
-     * @param      int     $offset       開始位置
-     * @param      boolean $total_rows   総レコード数を取得するかどうか
-     * @return     object  ActiveGatewayRecords
+     * @access  public
+     * @param   string  $alias
+     * @param   string  $sql
+     * @param   array   $params
+     * @return  ActiveGateway_Records
      */
-    public function findAllSql($alias, $sql, $params = array(), $limit = NULL, $offset = NULL,
-                                    $total_rows = false, $for_update = false)
+    public function findAllSql($alias, $sql, $params = array())
     {
-        if($total_rows) $sql = $this->Driver->modifyFoundRowsQuery($sql);
-        $res = $this->executeQuery($sql, $params, $limit, $offset, $for_update);
-        if($total_rows) $_total_rows = $this->Driver->getTotalRows($sql, $params);
+        //if($total_rows) $sql = $this->Driver->modifyFoundRowsQuery($sql);
+        $res = $this->query($sql, $params);
+        //if($total_rows) $_total_rows = $this->Driver->getTotalRows($sql, $params);
         
-        $Records = new ActiveGatewayRecords($res);
-        $Records->setAlias($alias);
+        $records = new ActiveGateway_Records($res);
+        $records->setAlias($alias);
         
         while($row = $res->fetch($this->_fetch_mode)){
-            $Record = $this->_buildRecord($alias, $row, false);
-            $Records->addRecord($Record);
+            $record = $this->_buildRecord($alias, $row, false);
+            $records->addRecord($record);
         }
         
-        $total_rows = ($total_rows) ? $_total_rows : $Records->getSize() ;
-        $Records->setTotalRows($total_rows);
-        return $Records;
+        //$total_rows = ($total_rows) ? $_total_rows : $Records->getSize() ;
+        //$records->setTotalRows($total_rows);
+        return $records;
     }
 
 
@@ -492,11 +485,11 @@ class ActiveGateway
      *
      * @access     public
      * @param      string  $alias        テーブル名
-     * @param      object  $condition    ActiveGatewayCondition
+     * @param      object  $condition    ActiveGateway_Condition
      * @param      array   $attributes   設定値
      * @return     boolean 
      */
-    public function updateDetail($alias, ActiveGatewayCondition $condition, $attributes = array())
+    public function updateDetail($alias, ActiveGateway_Condition $condition, $attributes = array())
     {
         return $this->updateAllDetail($alias, $condition, $attributes);
     }
@@ -559,11 +552,11 @@ class ActiveGateway
      *
      * @access     public
      * @param      string  $alias        テーブル名
-     * @param      object  $condition    ActiveGatewayCondition
+     * @param      object  $condition    ActiveGateway_Condition
      * @param      string  $attributes   設定値
      * @return     boolean
      */
-    public function updateAllDetail($alias, ActiveGatewayCondition $condition, $attributes = array())
+    public function updateAllDetail($alias, ActiveGateway_Condition $condition, $attributes = array())
     {
         //初期化
         $params = array();
@@ -628,9 +621,9 @@ class ActiveGateway
      *
      * @access     public
      * @param      string  $alias       テーブル名
-     * @param      object  $condition   ActiveGatewayCondition
+     * @param      object  $condition   ActiveGateway_Condition
      */
-    public function deleteDetail($alias, ActiveGatewayCondition $condition)
+    public function deleteDetail($alias, ActiveGateway_Condition $condition)
     {
         return $this->deleteAllDetail($alias, $condition);
     }
@@ -641,9 +634,9 @@ class ActiveGateway
      *
      * @access     public
      * @param      string   $alias       テーブル名
-     * @param      object   $condition   ActiveGatewayCondition
+     * @param      object   $condition   ActiveGateway_Condition
      */
-    public function deleteAllDetail($alias, ActiveGatewayCondition $condition)
+    public function deleteAllDetail($alias, ActiveGateway_Condition $condition)
     {
         $record = $this->_buildRecord($alias);
         //論理消去できるのであれば論理消去(こちらが望ましい)
@@ -1012,11 +1005,11 @@ class ActiveGateway
      * ActiveGatewayの検索用DTOを返却する
      *
      * @access     public
-     * @return     object   ActiveGatewayCondition
+     * @return     object   ActiveGateway_Condition
      */
     public static function getCondition()
     {
-        $condition = new ActiveGatewayCondition();
+        $condition = new ActiveGateway_Condition();
         return $condition;
     }
 
@@ -1067,10 +1060,10 @@ class ActiveGateway
      * SELECT文を作成
      *
      * @access  public
-     * @param   object  $cond   ActiveGatewayCondition
+     * @param   object  $cond   ActiveGateway_Condition
      * @return  string
      */
-    public function makeSelectQuery(ActiveGatewayCondition $cond)
+    public function makeSelectQuery(ActiveGateway_Condition $cond)
     {
         $sql = array();
         $selects = (array)$cond->select;
@@ -1096,11 +1089,11 @@ class ActiveGateway
      * UPDATE文を作成
      *
      * @access  public
-     * @param   object  $cond   ActiveGatewayCondition
+     * @param   object  $cond   ActiveGateway_Condition
      * @param   array   $attributes
      * @return  string
      */
-    public function makeUpdateQuery(ActiveGatewayCondition $cond, $attributes = array())
+    public function makeUpdateQuery(ActiveGateway_Condition $cond, $attributes = array())
     {
         $sql = array();
         $sql[] = sprintf('UPDATE %s SET', $this->Driver->escapeColumn($cond->from));
@@ -1127,11 +1120,11 @@ class ActiveGateway
      * DELETE文を作成
      *
      * @access  public
-     * @param   object  $cond   ActiveGatewayCondition
+     * @param   object  $cond   ActiveGateway_Condition
      * @param   array   $attributes
      * @return  string
      */
-    public function makeDeleteQuery(ActiveGatewayCondition $cond)
+    public function makeDeleteQuery(ActiveGateway_Condition $cond)
     {
         $sql = array();
         $sql[] = sprintf('DELETE FROM %s', $this->Driver->escapeColumn($cond->from));
@@ -1202,7 +1195,7 @@ class ActiveGateway
                         $condition = ActiveGateway::getCondition();
                         $_val = $condition->isEqual($_val);
                     }
-                    if($_val instanceof ActiveGatewayCondition_Value){
+                    if($_val instanceof ActiveGateway_Condition_Value){
                         if($_val->override){
                             $return[] = sprintf('%s %s', $column_key, $_val->override);
                         } else {
@@ -1210,7 +1203,7 @@ class ActiveGateway
                             $params[$place_holder] = $_val->value;
                             $return[] = sprintf('%s %s %s', $this->Driver->escapeColumn($column_key), $_val->operator, $place_holder);
                         }
-                    } elseif($_val instanceof ActiveGatewayCondition_Values){
+                    } elseif($_val instanceof ActiveGateway_Condition_Values){
                         if($_val->operator === 'IN' || $_val->operator === 'NOT IN'){
                             $_in = array();
                             foreach($_val->values as $_i => $_val2){
@@ -1307,7 +1300,7 @@ class ActiveGateway
     public function getHelper()
     {
         $manager = self::getManager();
-        return $manager->getHelper($this);
+        return $manager->getHelperByActiveGateway($this);
     }
 
 

@@ -172,6 +172,26 @@ class ActiveGateway_Helper
 
 
     /**
+     * get default length.
+     *
+     * @access  public
+     * @param   string  $type
+     * @return  mixed
+     */
+    public function getDefaultLength($type)
+    {
+        $length = NULL;
+        switch ( strtolower($type) ) {
+        case 'string':
+        case 'varchar':
+            $length = 255;
+            break;
+        }
+        return $length;
+    }
+
+
+    /**
      * generate bind key
      *
      * @access  protected
@@ -224,7 +244,7 @@ class ActiveGateway_Helper
             // compare version.
             $file_version = (int)$matches[1];
             $file_path = $path . '/' . $entry;
-            $class_name = join('', array_map('ucfirst', explode('_', str_replace('.php', '', $entry))));
+            $class_name = 'Migration_' . join('_', array_map('ucfirst', explode('_', str_replace('.php', '', $entry))));
             if ( $from === NULL && $to === NULL ) {
                 $files[$file_version] = array('path' => $file_path, 'class' => $class_name, 'version' => $file_version);
             } elseif ( $from !== NULL && $to !== NULL && $from <= $file_version && $file_version <= $to ) {

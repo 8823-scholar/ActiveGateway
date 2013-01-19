@@ -166,6 +166,10 @@ class ActiveGateway_Schema_Column
     public function type($type, $length = NULL)
     {
         $this->_type = $type;
+        if ( $length === NULL ) {
+            $helper = $this->_table->getHelper();
+            $length = $helper->getDefaultLength($type);
+        }
         $this->_type_length = $length;
         return $this;
     }

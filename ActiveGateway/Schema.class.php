@@ -63,10 +63,10 @@ class ActiveGateway_Schema
     /**
      * defined list.
      *
-     * @access  private
+     * @access  protected
      * @var     array
      */
-    private $_defines = array();
+    protected $_defines = array();
 
 
     /**

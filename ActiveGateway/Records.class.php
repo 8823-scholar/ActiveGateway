@@ -34,14 +34,14 @@
  */
 
 /**
- * ActiveGatewayにおいて、レコードの集合を管理するクラス
+ * embodiment records.
  *
  * @package     ActiveGateway
  * @copyright   Samurai Framework Project
  * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
-class ActiveGatewayRecords implements Iterator
+class ActiveGateway_Records implements Iterator
 {
     /**
      * alias

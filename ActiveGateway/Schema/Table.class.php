@@ -180,6 +180,7 @@ class ActiveGateway_Schema_Table
     {
         $column = new ActiveGateway_Schema_Column($name);
         $column->setTable($this);
+        $column->type(ActiveGateway_Schema::COLUMN_TYPE_STRING);
         $this->_columns[$name] = $column;
         return $column;
     }

@@ -37,6 +37,9 @@ require_once dirname(__DIR__) . '/ActiveGateway.class.php';
 require_once __DIR__ . '/Record.class.php';
 require_once __DIR__ . '/Records.class.php';
 require_once __DIR__ . '/Condition.class.php';
+require_once __DIR__ . '/Condition/Value.class.php';
+require_once __DIR__ . '/Condition/Values.class.php';
+require_once __DIR__ . '/Migration.class.php';
 require_once __DIR__ . '/PDO.class.php';
 require_once __DIR__ . '/Utils.class.php';
 require_once __DIR__ . '/Driver.abstract.php';
@@ -158,6 +161,19 @@ class ActiveGateway_Manager
     }
 
 
+    /**
+     * get all aliases.
+     *
+     * @access  public
+     * @return  array
+     */
+    public function getAliases()
+    {
+        return array_keys($this->_config);
+    }
+
+
+
 
     /**
      * get ActiveGateway instance.
@@ -181,6 +197,18 @@ class ActiveGateway_Manager
         } else {
             throw new ActiveGateway_Exception('dsn is not found. -> ' . $alias);
         }
+    }
+
+    /**
+     * synonym of getActiveGateway.
+     *
+     * @access  public
+     * @param   string  $alias
+     * @return  ActiveGateway
+     */
+    public function get($alias)
+    {
+        return $this->getActiveGateway($alias);
     }
 
 
@@ -373,13 +401,25 @@ class ActiveGateway_Manager
 
 
     /**
+     * get helper.
+     *
+     * @access  public
+     * @return  ActiveGateway_Helper
+     */
+    public function getHelper()
+    {
+        $helper = new ActiveGateway_Helper();
+        return $helper;
+    }
+
+    /**
      * get helper by ActiveGateway.
      *
      * @access  public
      * @param   ActiveGateway   $AG
      * @return  ActiveGateway_Helper
      */
-    public function getHelper(ActiveGateway $AG)
+    public function getHelperByActiveGateway(ActiveGateway $AG)
     {
         static $helpers = array();
         
