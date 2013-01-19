@@ -194,7 +194,7 @@ class ActiveGateway_Schema_Index
      */
     public function toString()
     {
-        $string = sprintf('create index: %s', $this->getName());
+        $string = sprintf('create index: %s to %s', $this->getName(), $this->getTableName());
         return $string;
     }
 

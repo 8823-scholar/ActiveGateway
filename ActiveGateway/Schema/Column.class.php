@@ -109,12 +109,36 @@ class ActiveGateway_Schema_Column
     private $_comment = '';
 
     /**
+     * after
+     *
+     * @access  private
+     * @var     string
+     */
+    private $_after = '';
+
+    /**
      * container table.
      *
      * @access  public
      * @var     ActiveGateway_Schema_Table
      */
     private $_table;
+
+    /**
+     * container table name.
+     *
+     * @access  private
+     * @var     string
+     */
+    private $_table_name;
+
+    /**
+     * schema
+     *
+     * @access  private
+     * @var     ActiveGateway_Schema
+     */
+    private $_schema;
 
 
     /**
@@ -150,6 +174,42 @@ class ActiveGateway_Schema_Column
     public function setTable(ActiveGateway_Schema_Table $table)
     {
         $this->_table = $table;
+        $this->setTableName($table->getName());
+    }
+
+
+    /**
+     * set table name.
+     *
+     * @access  public
+     * @param   string  $name
+     */
+    public function setTableName($name)
+    {
+        $this->_table_name = $name;
+    }
+
+    /**
+     * get table name.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function getTableName()
+    {
+        return $this->_table_name;
+    }
+
+
+    /**
+     * set a schema.
+     *
+     * @access  public
+     * @param   ActiveGateway_Schema    $schema
+     */
+    public function setSchema(ActiveGateway_Schema $schema)
+    {
+        $this->_schema = $schema;
     }
 
 
@@ -256,6 +316,18 @@ class ActiveGateway_Schema_Column
 
 
     /**
+     * set after.
+     *
+     * @access  public
+     * @param   string  $name
+     */
+    public function after($name)
+    {
+        $this->_after = $name;
+    }
+
+
+    /**
      * set a primary key.
      *
      * @access  public
@@ -293,10 +365,28 @@ class ActiveGateway_Schema_Column
      */
     public function toSQL(array &$params)
     {
-        $helper = $this->_table->getHelper();
+        if ( $this->hasTable() ) {
+            $helper = $this->_table->getHelper();
+        } else {
+            $helper = $this->_schema->getHelper();
+        }
         $sql = $helper->columnToSql($this, $params);
         return $sql;
     }
+
+
+    /**
+     * convert to string.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function toString()
+    {
+        $string = sprintf('add column: %s to %s', $this->getName(), $this->getTableName());
+        return $string;
+    }
+
 
 
     /**
@@ -347,6 +437,30 @@ class ActiveGateway_Schema_Column
 
 
     /**
+     * get comment.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function getComment()
+    {
+        return $this->_comment;
+    }
+
+
+    /**
+     * get after.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function getAfter()
+    {
+        return $this->_after;
+    }
+
+
+    /**
      * enable NULL ?
      *
      * @access  public
@@ -371,14 +485,14 @@ class ActiveGateway_Schema_Column
 
 
     /**
-     * get comment.
+     * has table ?
      *
      * @access  public
-     * @return  string
+     * @return  boolean
      */
-    public function getComment()
+    public function hasTable()
     {
-        return $this->_comment;
+        return $this->_table !== NULL;
     }
 
 
@@ -394,6 +508,7 @@ class ActiveGateway_Schema_Column
      */
     public function __call($method, array $args = array())
     {
+        var_dump($method);
         return call_user_func_array(array($this->_table, $method), $args);
     }
 }

@@ -156,10 +156,14 @@ abstract class ActiveGateway_Migration extends ActiveGateway_Schema
     {
         $this->start();
         $this->setup();
-        if ( $this->_direction === self::DIRECTION_UP ) {
-            $this->up();
-        } elseif ( $this->direction === self::DIRECTION_DOWN ) {
-            $this->down();
+        try {
+            $this->change();
+        } catch(ActiveGateway_Exception_Migration_NoChangeMethod $E) {
+            if ( $this->_direction === self::DIRECTION_UP ) {
+                $this->up();
+            } elseif ( $this->_direction === self::DIRECTION_DOWN ) {
+                $this->down();
+            }
         }
         $this->apply();
         $this->finish();
@@ -191,13 +195,25 @@ abstract class ActiveGateway_Migration extends ActiveGateway_Schema
 
 
     /**
-     * whien version down.
+     * when version down.
      *
      * @access  public
      */
     public function down()
     {
         $this->flushMessage('Nothing to do.');
+    }
+
+
+    /**
+     * when version change
+     *
+     * @access  public
+     */
+    public function change()
+    {
+        require_once __DIR__ . DS . 'Exception/Migration/NoChangeMethod.class.php';
+        throw new ActiveGateway_Exception_Migration_NoChangeMethod();
     }
 
 

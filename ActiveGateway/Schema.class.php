@@ -188,6 +188,26 @@ class ActiveGateway_Schema
 
 
     /**
+     * add column.
+     * not apply into database immediately.
+     *
+     * @access  public
+     * @param   string  $table
+     * @param   string  $name
+     * @return  ActiveGateway_Schema_Column
+     */
+    public function addColumn($table, $name)
+    {
+        $column = new ActiveGateway_Schema_Column($name);
+        $column->setSchema($this);
+        $column->setTableName($table);
+        $this->_defines[] = $column;
+
+        return $column;
+    }
+
+
+    /**
      * create index.
      * not apply into database immediately.
      *

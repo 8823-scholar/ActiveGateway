@@ -107,6 +107,13 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
      */
     public function columnToSql(ActiveGateway_Schema_Column $column, array &$params)
     {
+        $sql = array();
+
+        // if alter
+        if ( ! $column->hasTable() ) {
+            $sql[] = sprintf('ALTER TABLE %s ADD COLUMN', $column->getTableName());
+        }
+
         $values = array();
         $values[] = $this->escapeColumn($column->getName());
         $values[] = $this->columnTypeToSQL($column->getType(), $column->getTypeLength(), $params);
@@ -133,7 +140,18 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
             $values[] = 'COMMENT ' . $bind_key;
             $params[$bind_key] = $comment;
         }
-        $sql = join(' ', $values);
+
+        if ( $after = $column->getAfter() ) {
+            $values[] = 'AFTER ' . $this->escapeColumn($after);
+        }
+        $sql[] = join(' ', $values);
+
+        if ( ! $column->hasTable() ) {
+            $sql = join(' ', $sql) . ';';
+        } else {
+            $sql = join(' ', $sql);
+        }
+
         return $sql;
     }
     
