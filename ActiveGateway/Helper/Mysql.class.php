@@ -110,39 +110,49 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
         $sql = array();
 
         // if alter
+        $need_column_define = true;
         if ( ! $column->hasTable() ) {
-            $sql[] = sprintf('ALTER TABLE %s ADD COLUMN', $column->getTableName());
+            $sql[] = sprintf('ALTER TABLE %s', $this->escapeColumn($column->getTableName()));
+            if ( $column->isDrop() ) {
+                $need_column_define = false;
+                $sql[] = sprintf('DROP COLUMN', $this->escapeColumn($column->getName()));
+            } else {
+                $sql[] = sprintf('ADD COLUMN', $this->escapeColumn($column->getName()));
+            }
         }
 
         $values = array();
         $values[] = $this->escapeColumn($column->getName());
-        $values[] = $this->columnTypeToSQL($column->getType(), $column->getTypeLength(), $params);
-        if ( ! $column->isEnableNull() ) {
-            $values[] = 'NOT NULL';
-        }
-        $default = $column->getDefaultValue();
-        if ( $default === NULL && $column->isEnableNull() ) {
-            $values[] = 'DEFAULT NULL';
-        } elseif ( $default !== NULL ) {
-            $bind_key = $this->_generateBindKey('column_default', $column->getName());
-            $values[] = 'DEFAULT ' . $bind_key;
-            $params[$bind_key] = $default;
-        }
-        if ( $column->isAutoIncrement() ) {
-            $values[] = 'AUTO_INCREMENT';
-        }
-        if ( $collate = $column->getCollate() ) {
-            $values[] = 'COLLATE ' . $collate;
-        }
 
-        if ( $comment = $column->getComment() ) {
-            $bind_key = $this->_generateBindKey('column_comment', $column->getName());
-            $values[] = 'COMMENT ' . $bind_key;
-            $params[$bind_key] = $comment;
-        }
+        if ( $need_column_define ) {
+            $values[] = $this->columnTypeToSQL($column->getType(), $column->getTypeLength(), $params);
+            if ( ! $column->isEnableNull() ) {
+                $values[] = 'NOT NULL';
+            }
+            $default = $column->getDefaultValue();
+            if ( $default === NULL && $column->isEnableNull() ) {
+                $values[] = 'DEFAULT NULL';
+            } elseif ( $default !== NULL ) {
+                $bind_key = $this->_generateBindKey('column_default', $column->getName());
+                $values[] = 'DEFAULT ' . $bind_key;
+                $params[$bind_key] = $default;
+            }
+            if ( $column->isAutoIncrement() ) {
+                $values[] = 'AUTO_INCREMENT';
+            }
+            if ( $collate = $column->getCollate() ) {
+                $values[] = 'COLLATE ' . $collate;
+            }
 
-        if ( $after = $column->getAfter() ) {
-            $values[] = 'AFTER ' . $this->escapeColumn($after);
+            if ( $comment = $column->getComment() ) {
+                $bind_key = $this->_generateBindKey('column_comment', $column->getName());
+                $values[] = 'COMMENT ' . $bind_key;
+                $params[$bind_key] = $comment;
+            }
+
+            if ( $after = $column->getAfter() ) {
+                $values[] = 'AFTER ' . $this->escapeColumn($after);
+            }
         }
         $sql[] = join(' ', $values);
 
@@ -162,13 +172,21 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
     public function indexToSql(ActiveGateway_Schema_Index $index, array &$params)
     {
         $sql = array();
+        
+        // if drop.
         $sql[] = sprintf('ALTER TABLE %s', $this->escapeColumn($index->getTableName()));
-        $sql[] = sprintf('ADD INDEX %s', $index->getName());
-        $columns = array();
-        foreach ( $index->getColumns() as $column ) {
-            $columns[] = $this->escapeColumn($column);
+        if ( $index->isDrop() ) {
+            $sql[] = sprintf('DROP INDEX %s', $this->escapeColumn($index->getName()));
+
+        } else {
+            $sql[] = sprintf('ADD INDEX %s', $this->escapeColumn($index->getName()));
+            $columns = array();
+            foreach ( $index->getColumns() as $column ) {
+                $columns[] = $this->escapeColumn($column);
+            }
+            $sql[] = sprintf('(%s)', join(', ', $columns));
         }
-        $sql[] = sprintf('(%s)', join(', ', $columns));
+        
         $sql = join(' ', $sql) . ';';
         return $sql;
     }

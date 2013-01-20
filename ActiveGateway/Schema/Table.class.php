@@ -107,7 +107,7 @@ class ActiveGateway_Schema_Table
      * @var     ActiveGateway_Schema
      */
     private $_schema;
-
+    
     /**
      * mode.
      * default is "create".
@@ -115,21 +115,7 @@ class ActiveGateway_Schema_Table
      * @access  private
      * @var     int
      */
-    private $_mode = self::MODE_CREATE;
-
-    /**
-     * const: mode "create".
-     *
-     * @const   int
-     */
-    const MODE_CREATE = 1;
-
-    /**
-     * const: mode "drop".
-     *
-     * @const   int
-     */
-    const MODE_DROP = 2;
+    private $_mode = ActiveGateway_Schema::MODE_CREATE;
 
 
     /**
@@ -268,8 +254,24 @@ class ActiveGateway_Schema_Table
      */
     public function drop()
     {
-        $this->_mode = self::MODE_DROP;
+        $this->_mode = ActiveGateway_Schema::MODE_DROP;
         return $this;
+    }
+
+
+    /**
+     * define to reverse.
+     *
+     * @access  public
+     */
+    public function revert()
+    {
+        // drop is can't revert.
+        if ( $this->isDrop() ) {
+            throw new ActiveGateway_Exception('drop is can not revert.');
+        }
+
+        $this->drop();
     }
 
 
@@ -300,7 +302,11 @@ class ActiveGateway_Schema_Table
      */
     public function toString()
     {
-        $string = sprintf('create table: %s', $this->getName());
+        if ( $this->isDrop() ) {
+            $string = sprintf('drop table: %s', $this->getName());
+        } else {
+            $string = sprintf('create table: %s', $this->getName());
+        }
         return $string;
     }
 
@@ -398,7 +404,7 @@ class ActiveGateway_Schema_Table
      */
     public function isDrop()
     {
-        return $this->_mode === self::MODE_DROP;
+        return $this->_mode === ActiveGateway_Schema::MODE_DROP;
     }
 
 

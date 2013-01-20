@@ -139,6 +139,15 @@ class ActiveGateway_Schema_Column
      * @var     ActiveGateway_Schema
      */
     private $_schema;
+    
+    /**
+     * mode.
+     * default is "create".
+     *
+     * @access  private
+     * @var     int
+     */
+    private $_mode = ActiveGateway_Schema::MODE_CREATE;
 
 
     /**
@@ -354,6 +363,35 @@ class ActiveGateway_Schema_Column
     }
     
     
+    /**
+     * set mode "drop".
+     *
+     * @access  public
+     * @return  ActiveGateway_Schema_Table
+     */
+    public function drop()
+    {
+        $this->_mode = ActiveGateway_Schema::MODE_DROP;
+        return $this;
+    }
+
+
+    /**
+     * define to reverse.
+     *
+     * @access  public
+     */
+    public function revert()
+    {
+        // drop is can't revert.
+        if ( $this->isDrop() ) {
+            throw new ActiveGateway_Exception('drop is can not revert.');
+        }
+
+        $this->drop();
+    }
+    
+    
     
     
     
@@ -383,7 +421,11 @@ class ActiveGateway_Schema_Column
      */
     public function toString()
     {
-        $string = sprintf('add column: %s to %s', $this->getName(), $this->getTableName());
+        if ( $this->isDrop() ) {
+            $string = sprintf('remove column: %s from %s', $this->getName(), $this->getTableName());
+        } else {
+            $string = sprintf('add column: %s to %s', $this->getName(), $this->getTableName());
+        }
         return $string;
     }
 
@@ -485,6 +527,18 @@ class ActiveGateway_Schema_Column
 
 
     /**
+     * is drop
+     *
+     * @access  public
+     * @return  boolean
+     */
+    public function isDrop()
+    {
+        return $this->_mode === ActiveGateway_Schema::MODE_DROP;
+    }
+
+
+    /**
      * has table ?
      *
      * @access  public
@@ -508,7 +562,6 @@ class ActiveGateway_Schema_Column
      */
     public function __call($method, array $args = array())
     {
-        var_dump($method);
         return call_user_func_array(array($this->_table, $method), $args);
     }
 }

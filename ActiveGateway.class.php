@@ -579,17 +579,15 @@ class ActiveGateway
 
 
     /**
-     * updateAllシリーズ、SQL更新
+     * update all.
      *
-     * @access     public
-     * @param      string   $sql      SQL文
-     * @param      array    $params   ブレースフォルダ
-     * @param      int      $limit    更新数
-     * @return     resource PDOステートメント
+     * @access  public
+     * @param   string   $sql
+     * @param   array    $params
      */
-    public function updateAllSql($sql, $params = array(), $limit = NULL)
+    public function updateAllSql($sql, $params = array())
     {
-        $stmt = $this->executeUpdate($sql, $params, $limit);
+        $stmt = $this->query($sql, $params);
         return $stmt;
     }
 

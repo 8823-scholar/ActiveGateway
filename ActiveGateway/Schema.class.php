@@ -78,6 +78,14 @@ class ActiveGateway_Schema
     const COLUMN_TYPE_LIST = 'list';
 
     /**
+     * const: mode
+     *
+     * @const   int
+     */
+    const MODE_CREATE = 1;
+    const MODE_DROP = 2;
+
+    /**
      * const: table name of migrations.
      *
      * @const   string

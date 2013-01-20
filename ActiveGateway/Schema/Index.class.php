@@ -75,6 +75,15 @@ class ActiveGateway_Schema_Index
      * @var     ActiveGateway_Schema
      */
     protected $_schema;
+    
+    /**
+     * mode.
+     * default is "create".
+     *
+     * @access  private
+     * @var     int
+     */
+    private $_mode = ActiveGateway_Schema::MODE_CREATE;
 
 
     /**
@@ -171,6 +180,53 @@ class ActiveGateway_Schema_Index
     
     
     
+    /**
+     * append target column
+     *
+     * @access  public
+     * @param   string  $column_name
+     * @return  ActiveGateway_Schema_Index
+     */
+    public function append($column_name)
+    {
+        if ( ! is_string($column_name) ) throw new ActiveGateway_Exception('Invalid column name.');
+        if ( ! in_array($column_name, $this->_columns) ) {
+            $this->_columns[] = $column_name;
+        }
+        return $this;
+    }
+    
+    
+    /**
+     * set mode "drop".
+     *
+     * @access  public
+     * @return  ActiveGateway_Schema_Table
+     */
+    public function drop()
+    {
+        $this->_mode = ActiveGateway_Schema::MODE_DROP;
+        return $this;
+    }
+
+
+    /**
+     * define to reverse.
+     *
+     * @access  public
+     */
+    public function revert()
+    {
+        // drop is can't revert.
+        if ( $this->isDrop() ) {
+            throw new ActiveGateway_Exception('drop is can not revert.');
+        }
+
+        $this->drop();
+    }
+    
+    
+    
     
     /**
      * convert to SQL.
@@ -194,28 +250,15 @@ class ActiveGateway_Schema_Index
      */
     public function toString()
     {
-        $string = sprintf('create index: %s to %s', $this->getName(), $this->getTableName());
+        if ( $this->isDrop() ) {
+            $string = sprintf('remove index: %s from %s', $this->getName(), $this->getTableName());
+        } else {
+            $string = sprintf('create index: %s to %s', $this->getName(), $this->getTableName());
+        }
         return $string;
     }
 
 
-
-
-    /**
-     * append target column
-     *
-     * @access  public
-     * @param   string  $column_name
-     * @return  ActiveGateway_Schema_Index
-     */
-    public function append($column_name)
-    {
-        if ( ! is_string($column_name) ) throw new ActiveGateway_Exception('Invalid column name.');
-        if ( ! in_array($column_name, $this->_columns) ) {
-            $this->_columns[] = $column_name;
-        }
-        return $this;
-    }
 
 
     /**
@@ -227,6 +270,18 @@ class ActiveGateway_Schema_Index
     public function getColumns()
     {
         return $this->_columns;
+    }
+
+
+    /**
+     * is drop
+     *
+     * @access  public
+     * @return  boolean
+     */
+    public function isDrop()
+    {
+        return $this->_mode === ActiveGateway_Schema::MODE_DROP;
     }
 }
 

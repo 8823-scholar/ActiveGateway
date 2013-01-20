@@ -152,19 +152,42 @@ abstract class ActiveGateway_Migration extends ActiveGateway_Schema
      *
      * @access  public
      */
-    public function execute()
+    public function migrate()
     {
         $this->start();
         $this->setup();
         try {
             $this->change();
         } catch(ActiveGateway_Exception_Migration_NoChangeMethod $E) {
-            if ( $this->_direction === self::DIRECTION_UP ) {
-                $this->up();
-            } elseif ( $this->_direction === self::DIRECTION_DOWN ) {
-                $this->down();
-            }
+            $this->up();
         }
+        $this->apply();
+        $this->finish();
+    }
+
+
+    /**
+     * revert ( reverse of migrate )
+     *
+     * @access  public
+     */
+    public function revert()
+    {
+        $this->_direction = self::DIRECTION_DOWN;
+
+        $this->start();
+        $this->setup();
+
+        try {
+            $this->change();
+        } catch(ActiveGateway_Exception_Migration_NoChangeMethod $E) {
+            $this->down();
+        }
+        $this->_defines = array_reverse($this->_defines);
+        foreach ( $this->_defines as $define ) {
+            $define->revert();
+        }
+
         $this->apply();
         $this->finish();
     }
@@ -232,7 +255,7 @@ abstract class ActiveGateway_Migration extends ActiveGateway_Schema
             $this->AG->query($sql, $params);
 
             $string = $define->toString();
-            $this->flushMessage($string);
+            $this->flushMessage('-- ' . $string);
             $this->flushMessage(sprintf('   -> %0.4f sec', $this->getRapTime()));
         }
     }
@@ -249,7 +272,13 @@ abstract class ActiveGateway_Migration extends ActiveGateway_Schema
     public function start()
     {
         $this->_time = microtime(true);
-        $message = sprintf('%s: %s', $this->getName(), 'migrating');
+
+        if ( $this->isVersionUp() ) {
+            $phrase = 'migrating';
+        } else {
+            $phrase = 'reverting';
+        }
+        $message = sprintf('%s: %s', $this->getName(), $phrase);
         $message = $this->_formatMessageH1($message);
         $this->flushMessage($message);
     }
@@ -263,10 +292,19 @@ abstract class ActiveGateway_Migration extends ActiveGateway_Schema
     public function finish()
     {
         // memory version
-        $version = $this->getVersion();
-        $this->AG->create(ActiveGateway_Schema::TABLE_SCHEMA_MIGRATIONS, array('version' => $version));
+        if ( $this->isVersionUp() ) {
+            $phrase = 'migrated';
+            $version = $this->getVersion();
+            $this->AG->create(ActiveGateway_Schema::TABLE_SCHEMA_MIGRATIONS, array('version' => $version));
+        } else {
+            $phrase = 'reverted';
+            $version = $this->getVersion();
+            $cond = $this->AG->getCondition();
+            $cond->where->version = $version;
+            $this->AG->deleteDetail(ActiveGateway_Schema::TABLE_SCHEMA_MIGRATIONS, $cond);
+        }
 
-        $message = sprintf('%s: %s (%0.4f sec)', $this->getName(), 'migrated', $this->getTime());
+        $message = sprintf('%s: %s (%0.4f sec)', $this->getName(), $phrase, $this->getTime());
         $message = $this->_formatMessageH1($message);
         $this->flushMessage($message);
     }
@@ -338,6 +376,33 @@ abstract class ActiveGateway_Migration extends ActiveGateway_Schema
         $version = array_shift($names);
         return (int)$version;
     }
+
+
+
+    /**
+     * is version up
+     *
+     * @access  public
+     * @return  boolean
+     */
+    public function isVersionUp()
+    {
+        return $this->_direction === self::DIRECTION_UP;
+    }
+
+
+    /**
+     * is version down.
+     *
+     * @access  public
+     * @return  boolean
+     */
+    public function isVersionDown()
+    {
+        return $this->_direction === self::DIRECTION_DOWN;
+    }
+
+
 
 
     /**
