@@ -38,6 +38,6 @@
         }
     ],
     "autoload": {
-        "classmap": ["."]
+        "classmap": ["ActiveGateway.class.php", "ActiveGateway"]
     }
 }
