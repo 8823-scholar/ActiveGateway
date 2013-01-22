@@ -259,6 +259,27 @@ class ActiveGateway_Schema_Index
     }
 
 
+    /**
+     * convert to code.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function toCode()
+    {
+        $code = array();
+
+        $columns = $this->getColumns();
+        $code[] = sprintf('$this->createIndex(\'%s\', \'%s\')', $this->getTableName(), array_shift($columns));
+        while ( $column = array_shift($columns) ) {
+            $code[] = sprintf('->append(\'%s\')', $column);
+        }
+        $code[] = sprintf('->setName(\'%s\')', $this->getName());
+
+        return join('', $code) . ';';
+    }
+
+
 
 
     /**

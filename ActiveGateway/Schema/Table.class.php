@@ -101,6 +101,14 @@ class ActiveGateway_Schema_Table
     private $_comment;
 
     /**
+     * row format
+     *
+     * @access  private
+     * @var     string
+     */
+    private $_row_format;
+
+    /**
      * schema
      *
      * @access  private
@@ -183,7 +191,9 @@ class ActiveGateway_Schema_Table
     public function primary($column_name)
     {
         $primary = new ActiveGateway_Schema_Primary($this->getName(), $column_name);
-        $primary->setSchema($this->getSchema());
+        if ( $schema = $this->getSchema() ) {
+            $primary->setSchema($this->getSchema());
+        }
         $this->_keys[] = $primary;
         return $primary;
     }
@@ -242,6 +252,47 @@ class ActiveGateway_Schema_Table
     public function comment($comment)
     {
         $this->_comment = $comment;
+        return $this;
+    }
+
+
+    /**
+     * set row format.
+     *
+     * @access  public
+     * @param   string  $format
+     * @return  ActiveGateway_Schema_Table
+     */
+    public function rowFormat($format)
+    {
+        $this->_row_format = $format;
+    }
+
+
+    /**
+     * add timestamp fields.
+     *
+     * @access  public
+     * @return  ActiveGateway_Schema_Table
+     */
+    public function timestamps()
+    {
+        $this->column('created_at')->type('integer', 11)->enableNull()->defaultValue(0);
+        $this->column('updated_at')->type('integer', 11)->enableNull()->defaultValue(0);
+        $this->column('deleted_at')->type('integer', 11)->enableNull()->defaultValue(NULL);
+        return $this;
+    }
+
+
+    /**
+     * add logical delete flag.
+     *
+     * @access  public
+     * @return  ActiveGateway_Schema_Table
+     */
+    public function logicalDelete()
+    {
+        $this->column('active')->type('list', array('0','1'))->defaultValue('1');
         return $this;
     }
 
@@ -308,6 +359,49 @@ class ActiveGateway_Schema_Table
             $string = sprintf('create table: %s', $this->getName());
         }
         return $string;
+    }
+
+
+    /**
+     * convert to code.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function toCode()
+    {
+        $code = array();
+        $code[] = sprintf('$this->createTable(\'%s\')', $this->getName());
+
+        // columns
+        $columns = $this->getColumns();
+        $columns_count = count($columns);
+        $i = 0;
+        foreach ( $columns as $column ) {
+            $i++;
+            if ( $column->getName() == 'id' ) continue;
+            $code[] = '    ' . $column->toCode();
+        }
+
+        // options
+        $options = array();
+        if ( $engine = $this->getEngine() ) {
+            $options[] = sprintf('->engine(\'%s\')', $engine);
+        }
+        if ( $charset = $this->getCharset() ) {
+            $options[] = sprintf('->charset(\'%s\')', $charset);
+        }
+        if ( $collate = $this->getCollate() ) {
+            $options[] = sprintf('->collate(\'%s\')', $collate);
+        }
+        if ( $comment = $this->getComment() ) {
+            $options[] = sprintf('->comment(\'%s\')', $comment);
+        }
+        if ( $options ) {
+            $code[] = '    ' . join('', $options);
+        }
+
+        return join("\n", $code) . ';';
     }
 
 
@@ -393,6 +487,18 @@ class ActiveGateway_Schema_Table
     public function getComment()
     {
         return $this->_comment;
+    }
+
+
+    /**
+     * get row format.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function getRowFormat()
+    {
+        return $this->_row_format;
     }
 
 

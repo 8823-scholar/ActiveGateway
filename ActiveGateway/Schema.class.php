@@ -75,6 +75,7 @@ class ActiveGateway_Schema
      * @const   string
      */
     const COLUMN_TYPE_STRING = 'string';
+    const COLUMN_TYPE_INTEGER = 'integer';
     const COLUMN_TYPE_LIST = 'list';
 
     /**
@@ -99,7 +100,7 @@ class ActiveGateway_Schema
      * @access  public
      * @param   string  $alias
      */
-    public function __construct($alias)
+    public function __construct($alias = 'base')
     {
         $this->_alias = $alias;
     }
@@ -171,7 +172,7 @@ class ActiveGateway_Schema
         $this->_defines[] = $table;
 
         // conversion: id is exists.
-        $table->column('id')->type('int', 11)->primary();
+        $table->column('id')->type('integer', 11)->primary();
 
         return $table;
     }

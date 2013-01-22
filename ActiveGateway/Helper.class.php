@@ -224,6 +224,37 @@ class ActiveGateway_Helper
 
 
     /**
+     * get table names
+     *
+     * @access  public
+     * @param   ActiveGateway   $AG
+     * @return  array
+     */
+    public function getTables(ActiveGateway $AG)
+    {
+        throw new ActiveGateway_Exception('implements method. -> getTables');
+    }
+
+
+
+    /*
+     * get defines by table name.
+     *
+     * @access  public
+     * @param   ActiveGateway   $AG
+     * @param   string  $table_name
+     * @return  array
+     */
+    public function getDefinesByTableName(ActiveGateway $AG, $table_name)
+    {
+        throw new ActiveGateway_Exception('implements method. -> getDefinesByTableName');
+    }
+
+
+
+
+
+    /**
      * get migration files.
      *
      * @access  public

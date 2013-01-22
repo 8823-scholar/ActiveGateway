@@ -888,58 +888,58 @@ class ActiveGateway
 
 
     /**
-     * PEAR_DB::getAll()と同等
+     * like PEAR::DB::getAll()
      *
-     * @param      string  $sql      SQL文
-     * @param      array   $params   ブレースフォルダ
-     * @param      int     $limit    取得数
-     * @param      int     $offset   開始位置
-     * @return     array   すべての取得結果
+     * @param   string  $sql
+     * @param   array   $params
+     * @param   int     $limit
+     * @param   int     $offset
+     * @return  array   すべての取得結果
      */
     public function getAll($sql, $params = array(), $limit = NULL, $offset = NULL)
     {
-        $stmt = $this->executeQuery($sql, $params, $limit, $offset);
+        // TODO: limit
+        $stmt = $this->query($sql, $params);
         return $stmt->fetchAll($this->_fetch_mode);
     }
 
 
     /**
-     * PEAR_DB::getRow()と同等
+     * like PEAR::DB::getRow()
      *
-     * @param      string  $sql      SQL文
-     * @param      array   $params   ブレースフォルダ
-     * @return     array   1レコードの結果
+     * @param   string  $sql
+     * @param   array   $params
+     * @return  array  
      */
     public function getRow($sql, $params = array())
     {
-        $stmt = $this->executeQuery($sql, $params, 1);
-        $row  = $stmt->fetch($this->_fetch_mode);
+        // TODO: limit 1
+        $stmt = $this->query($sql, $params);
+        $row = $stmt->fetch($this->_fetch_mode);
         return $row;
     }
 
 
     /**
-     * PEAR_DB::getCol()と同等
+     * like PEAR::DB::getCol()
      *
-     * @param      string  $sql      SQL文
-     * @param      array   $params   ブレースフォルダ
-     * @param      mixed   $column   カラム名指定
-     * @return     array   取得結果
+     * @param   string  $sql
+     * @param   array   $params
+     * @param   string  $column
+     * @return  array
      */
     public function getCol($sql, $params = array(), $column = NULL)
     {
-        $stmt = $this->executeQuery($sql, $params);
+        $stmt = $this->query($sql, $params);
         $rows = $stmt->fetchAll(ActiveGateway::FETCH_BOTH);
+        
         $result = array();
-        foreach($rows as $row){
-            if($column !== NULL){
-                if(isset($row[$column])){
-                    $result[] = $row[$column];
-                } else {
-                    $result[] = $row[0];
-                }
+        $column = $column === NULL ? 0 : $column;
+        foreach ( $rows as $row ) {
+            if ( array_key_exists($column, $row) ) {
+                $result[] = $row[$column];
             } else {
-                $result[] = $row[0];
+                $result[] = NULL;
             }
         }
         return $result;
@@ -947,23 +947,25 @@ class ActiveGateway
 
 
     /**
-     * PEAR_DB::getOne()と同等
+     * like PEAR::DB::getOne()
      *
-     * @param      string  $sql      SQL文
-     * @param      array   $params   ブレースフォルダ
-     * @param      mixed   $column   カラム名指定
-     * @return     mixed   取得結果
+     * @param   string  $sql
+     * @param   array   $params
+     * @param   string  $column
+     * @return  mixed
      */
     public function getOne($sql, $params = array(), $column = NULL)
     {
-        $stmt = $this->executeQuery($sql, $params);
+        // TODO: limit 1
+        $stmt = $this->query($sql, $params);
         $row = $stmt->fetch(ActiveGateway::FETCH_BOTH);
-        if($column !== NULL){
-            if(isset($row[$column])){
-                return $row[$column];
-            }
+
+        $column = $column === NULL ? 0 : $column;
+        if ( array_key_exists($column, $row) ) {
+            return $row[$column];
+        } else {
+            return NULL;
         }
-        return $row[0];
     }
 
 

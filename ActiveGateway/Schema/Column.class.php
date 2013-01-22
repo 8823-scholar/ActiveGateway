@@ -430,6 +430,50 @@ class ActiveGateway_Schema_Column
     }
 
 
+    /**
+     * convert to code.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function toCode()
+    {
+        $code = array();
+        if ( $this->hasTable() ) {
+            $code[] = sprintf('->column(\'%s\')', $this->getName());
+            if ( $length = $this->getTypeLength() ) {
+                if ( is_array($length) ) {
+                    foreach ( $length as $_key => &$_val ) {
+                        if ( $this->isStringTypeLength($this->getType()) ) {
+                            $_val = "'" . $_val . "'";
+                        }
+                    }
+                    $length = 'array(' . join(',', $length). ')';
+                    $code[] = sprintf('->type(\'%s\', %s)', $this->getType(), $length);
+                } else {
+                    if ( $this->isStringTypeLength($this->getType()) ) {
+                        $length = "'" . $length . "'";
+                    }
+                    $code[] = sprintf('->type(\'%s\', %s)', $this->getType(), $length);
+                }
+            } else {
+                $code[] = sprintf('->type(\'%s\')', $this->getType());
+            }
+        }
+        if ( $default = $this->getDefaultValue() ) {
+            $code[] = sprintf('->defaultValue(\'%s\')', $default);
+        }
+        if ( $collate = $this->getCollate() ) {
+            $code[] = sprintf('->collate(\'%s\')', $collate);
+        }
+        if ( $comment = $this->getComment() ) {
+            $code[] = sprintf('->comment(\'%s\')', $comment);
+        }
+
+        return join('', $code);
+    }
+
+
 
     /**
      * get type.
@@ -547,6 +591,26 @@ class ActiveGateway_Schema_Column
     public function hasTable()
     {
         return $this->_table !== NULL;
+    }
+
+
+    /**
+     * length is need string format ?
+     *
+     * @access  public
+     * @param   string  $type
+     * @return  boolean
+     */
+    public function isStringTypeLength($type)
+    {
+        switch ( $type ) {
+        case ActiveGateway_Schema::COLUMN_TYPE_LIST:
+            return true;
+            break;
+        default:
+            return false;
+            break;
+        }
     }
 
 

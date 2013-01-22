@@ -83,17 +83,20 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
 
             $options = array();
             if ( $engine = $table->getEngine() ) {
-                $options[] = 'ENGINE = ' . $engine;
+                $options[] = 'ENGINE=' . $engine;
+            }
+            if ( $format = $table->getRowFormat() ) {
+                $options[] = 'ROW_FORMAT=' . $format;
             }
             if ( $charset = $table->getCharset() ) {
-                $options[] = 'DEFAULT CHARSET = ' . $charset;
+                $options[] = 'DEFAULT CHARSET=' . $charset;
             }
             if ( $collate = $table->getCollate() ) {
-                $options[] = 'COLLATE = ' . $collate;
+                $options[] = 'COLLATE=' . $collate;
             }
             if ( $comment = $table->getComment() ) {
                 $bind_key = $this->_generateBindKey('table_comment', $table->getName());
-                $options[] = 'COMMENT = ' . $bind_key;
+                $options[] = 'COMMENT=' . $bind_key;
                 $params[$bind_key] = $comment;
             }
             $sql[] = ') ' . join(' ', $options) . ';';
@@ -245,6 +248,128 @@ class ActiveGateway_Helper_Mysql extends ActiveGateway_Helper
         }
 
         return $converted;
+    }
+    
+    /**
+     * @override
+     */
+    public function reverseConvertColumnType($type)
+    {
+        $converted = $type;
+
+        switch ( strtoupper($type) ) {
+        case 'VARCHAR':
+            $converted = ActiveGateway_Schema::COLUMN_TYPE_STRING;
+            break;
+        case 'ENUM':
+            $converted = ActiveGateway_Schema::COLUMN_TYPE_LIST;
+            break;
+        case 'INT':
+        case 'TINYINT':
+        case 'SMALLINT':
+        case 'MEDIUMINT':
+        case 'BIGINT':
+            $converted = ActiveGateway_Schema::COLUMN_TYPE_INTEGER;
+            break;
+        }
+
+        return $converted;
+    }
+
+
+
+
+
+    /**
+     * @implements
+     */
+    public function getTables(ActiveGateway $AG)
+    {
+        $sql = "SHOW TABLES;";
+        $result = $AG->getCol($sql);
+        return $result;
+    }
+
+
+
+    /**
+     * @implements
+     */
+    public function getDefinesByTableName(ActiveGateway $AG, $table_name)
+    {
+        $sql = sprintf("SHOW CREATE TABLE %s;", $this->escapeColumn($table_name));
+        $result = $AG->getOne($sql, array(), 1);
+        $schema = new ActiveGateway_Schema();
+        foreach ( explode("\n", $result) as $line ) {
+            $line = trim($line);
+            switch ( true ) {
+            case strpos($line, 'CREATE TABLE') === 0:
+                list($name) = sscanf($line, 'CREATE TABLE `%[^`]`');
+                $table = $schema->createTable($name);
+                break;
+            case strpos($line, 'PRIMARY KEY') === 0:
+                list($keys) = sscanf($line, 'PRIMARY KEY (%[^()])');
+                $keys = explode(',', str_replace(array('`', ' '), '', $keys));
+                $table->primary($keys);
+                break;
+            case strpos($line, 'UNIQUE KEY') === 0:
+                list($name, $keys) = sscanf($line, 'UNIQUE KEY `%[^`]` (%[^()])');
+                $keys = explode(',', str_replace(array('`', ' '), '', $keys));
+                $unique = $schema->createUnique($table->getName(), $keys)->setName($name);
+                break;
+            case strpos($line, 'KEY') === 0:
+                list($name, $keys) = sscanf($line, 'KEY `%[^`]` (%[^()])');
+                $keys = explode(',', str_replace(array('`', ' '), '', $keys));
+                $index = $schema->createIndex($table->getName(), $keys)->setName($name);
+                break;
+            case strpos($line, ')') === 0:
+                if ( preg_match('/ENGINE=(\w+)/', $line, $matches) ) {
+                    $table->engine($matches[1]);
+                }
+                if ( preg_match('/DEFAULT CHARSET=(\w+)/', $line, $matches) ) {
+                    $table->charset($matches[1]);
+                }
+                if ( preg_match('/COLLATE=(\w+)/', $line, $matches) ) {
+                    $table->collate($matches[1]);
+                }
+                if ( preg_match('/COMMENT=\'(.+?)\'/', $line, $matches) ) {
+                    $table->comment($matches[1]);
+                }
+                break;
+            default:
+                if ( preg_match('/^`(\w+)`/', $line, $matches) ) {
+                    $name = $matches[1];
+                }
+                if ( $name === 'id' ) break;
+                $column = $table->column($name);
+                if ( preg_match('/(\w+)\((\d+?)\)/', $line, $matches) ) {
+                    $type = $this->reverseConvertColumnType($matches[1]);
+                    $column->type($type, $matches[2]);
+                } elseif ( preg_match('/(\w+)\((.+?)\)/', $line, $matches) ) {
+                    $type = $this->reverseConvertColumnType($matches[1]);
+                    $length = str_getcsv($matches[2], ',', "'");
+                    $column->type($type, $length);
+                } else {
+                    throw new ActiveGateway_Exception('failed to parse schema line. -> ' . $line);
+                }
+                $column->enableNull();
+                if ( preg_match('/NOT NULL/', $line) ) {
+                    $column->notNull();
+                }
+                if ( preg_match('/DEFAULT \'(.+?)\'/', $line, $matches) ) {
+                    $column->defaultValue($matches[1]);
+                }
+                if ( preg_match('/COLLATE=(\w+)/', $line, $matches) ) {
+                    $column->collate($matches[1]);
+                }
+                if ( preg_match('/COMMENT=\'(.+?)\'/', $line, $matches) ) {
+                    $column->comment($matches[1]);
+                }
+                break;
+            }
+        }
+        $params = array();
+        return $schema->getDefines();
     }
 }
 

@@ -69,6 +69,27 @@ class ActiveGateway_Schema_Unique extends ActiveGateway_Schema_Index
         $string = sprintf('create unique index: %s', $this->getName());
         return $string;
     }
+
+
+    /**
+     * convert to code.
+     *
+     * @access  public
+     * @return  string
+     */
+    public function toCode()
+    {
+        $code = array();
+
+        $columns = $this->getColumns();
+        $code[] = sprintf('$this->createUnique(\'%s\', \'%s\')', $this->getTableName(), array_shift($columns));
+        while ( $column = array_shift($columns) ) {
+            $code[] = sprintf('->append(\'%s\')', $column);
+        }
+        $code[] = sprintf('->setName(\'%s\')', $this->getName());
+
+        return join('', $code) . ';';
+    }
     
     
     
