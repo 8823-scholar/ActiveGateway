@@ -33,6 +33,8 @@
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
 /**
  * ActiveGateway.
  * 

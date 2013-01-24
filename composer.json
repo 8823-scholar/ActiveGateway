@@ -4,7 +4,7 @@
     "version": "2.0.0-dev",
     "type": "library",
     "keywords":["ORM", "O/R Mapper", "Maple"],
-    "license": "http://www.opensource.org/licenses/bsd-license.php The BSD License",
+    "license": "MIT",
     "authors": [
         {
             "name": "KIUCHI Satoshinosuke",
@@ -14,7 +14,9 @@
         }
     ],
     "require": {
-        "spyc/spyc": "dev-master"
+        "samurai/samurai": "3.0.*"
+        "spyc/spyc": "dev-master",
+        "phpspec/phpspec": "*"
     },
     "repositories": [
         {
@@ -38,6 +40,6 @@
         }
     ],
     "autoload": {
-        "classmap": ["ActiveGateway.class.php", "ActiveGateway"]
+        "classmap": ["src"]
     }
 }
