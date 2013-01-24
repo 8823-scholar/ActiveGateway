@@ -3,7 +3,7 @@
     "description": "PHP O/R Mapper.",
     "version": "2.0.0-dev",
     "type": "library",
-    "keywords":["ORM", "O/R Mapper", "Maple"],
+    "keywords":["ORM", "Maple"],
     "license": "MIT",
     "authors": [
         {
