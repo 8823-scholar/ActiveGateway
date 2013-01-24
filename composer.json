@@ -14,7 +14,7 @@
         }
     ],
     "require": {
-        "samurai/samurai": "3.0.*"
+        "samurai/samurai": "3.0.*",
         "spyc/spyc": "dev-master",
         "phpspec/phpspec": "*"
     },
