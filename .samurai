@@ -1,0 +1,5 @@
+generator:
+    generator:
+        package: ActiveGateway
+        copyright: Samurai Framework Project
+        license: 'http://www.opensource.org/licenses/bsd-license.php The BSD License'

@@ -33,7 +33,10 @@
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
 
-require_once dirname(__DIR__) . '/vendor/autoload.php';
+$COMPOSER_AUTOLOAD = dirname(__DIR__) . '/vendor/autoload.php';
+if ( file_exists($COMPOSER_AUTOLOAD) ) {
+    require_once $COMPOSER_AUTOLOAD;
+}
 
 /**
  * ActiveGateway.

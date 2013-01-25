@@ -34,25 +34,15 @@
  */
 
 /**
- * Initialization for SPEC.
+ * Exception: Config.
  *
- * bootstrap script.
- * for database settings, and etc...
- * 
  * @package     ActiveGateway
- * @subpackage  Spec
+ * @subpackage  Exception
  * @copyright   Samurai Framework Project
  * @author      KIUCHI Satoshinosuke <scholar@hayabusa-lab.jp>
  * @license     http://www.opensource.org/licenses/bsd-license.php The BSD License
  */
-
-require_once dirname(__DIR__) . '/src/ActiveGateway.class.php';
-
-// DI
-$DI = Samurai::getContainer();
-
-// ActiveGateway
-$AGManager = ActiveGateway_Manager::singleton();
-$AGManager->import(Samurai_Loader::getPath('config/database/sandbox.yml'));
-$DI->registerComponent('AG', $AGManager->getActiveGateway('base'));
+class ActiveGateway_Exception_Config extends ActiveGateway_Exception
+{
+}
 
